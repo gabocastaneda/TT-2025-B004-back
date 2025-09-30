@@ -21,6 +21,8 @@ frames_video = []
 grabando = False
 mano_detectada_anteriormente = False
 estado_dedos_actual = []
+archivo_csv = "dataset_lsm.csv"
+clase_actual = "Hola"  
 
 def centroide(lista_coordenadas):
     coordenadas = np.array(lista_coordenadas)
@@ -162,39 +164,14 @@ def pizarron_a_vector_binario(pizarron, tamano_salida=(20, 20), umbral=128):
     
     return vector_binario, binaria
 
-def visualizar_vector_consola(vector_binario, tamano_original=(20, 20)):
-    """Visualiza el vector binario en la consola"""
-    matriz = vector_binario.reshape(tamano_original)
-    
-    print("\n" + "="*60)
-    print("VECTOR BINARIO DEL GESTO")
-    print("="*60)
-    
-    print(f"\nRepresentación visual ({tamano_original[0]}x{tamano_original[1]}):")
-    print("┌" + "─" * (tamano_original[1] * 2) + "┐")
-    for i in range(tamano_original[0]):
-        fila_str = "│"
-        for j in range(tamano_original[1]):
-            if matriz[i, j] == 255:
-                fila_str += "██"
-            else:
-                fila_str += "  "
-        fila_str += "│"
-        print(fila_str)
-    print("└" + "─" * (tamano_original[1] * 2) + "┘")
-    
-    return matriz
-
-def mostrar_dedos_consola(dedos):
-    """Muestra el estado de los dedos en consola"""
-    nombres_dedos = ["Pulgar", "Índice", "Medio", "Anular", "Meñique"]
-    print(f"\n✋ ESTADO DE DEDOS: {''.join([str(d) for d in dedos])}")
-    for i, (nombre, estado) in enumerate(zip(nombres_dedos, dedos)):
-        print(f"   {nombre}: {estado}")
-
 def generar_encabezados(tamano_vector=400):
     """Genera encabezados descriptivos para las columnas"""
-    encabezados = []
+    encabezados = ["clase"]
+    
+    # Encabezados para los dedos
+    nombres_dedos = ["pulgar", "indice", "medio", "anular", "menique"]
+    for dedo in nombres_dedos:
+        encabezados.append(f"dedo_{dedo}")
     
     # Encabezados para el vector de trayectoria (20x20 = 400 elementos)
     for i in range(tamano_vector):
@@ -202,76 +179,97 @@ def generar_encabezados(tamano_vector=400):
         columna = i % 20
         encabezados.append(f"pixel_{fila:02d}_{columna:02d}")
     
-    # Encabezados para los dedos
-    nombres_dedos = ["pulgar", "indice", "medio", "anular", "menique"]
-    for dedo in nombres_dedos:
-        encabezados.append(f"dedo_{dedo}")
-    
     return encabezados
 
-def exportar_datos_completos(vector_binario, dedos, nombre_archivo="datos_gesto.csv"):
-    """Exporta vector y estado de dedos a CSV con encabezados"""
+def inicializar_csv():
+    """Inicializa el archivo CSV con los encabezados"""
+    if not os.path.exists(archivo_csv):
+        encabezados = generar_encabezados()
+        df = pd.DataFrame(columns=encabezados)
+        df.to_csv(archivo_csv, index=False)
+        print(f"📁 Archivo CSV creado: {archivo_csv}")
+        print(f"📊 Estructura: Clase + 5 dedos + 400 pixels = 406 columnas")
+    else:
+        print(f"📁 Archivo CSV existente: {archivo_csv}")
+        print(f"📝 Se agregarán nuevos registros al final")
+
+def guardar_en_csv(clase, dedos, vector_binario):
+    """Guarda un nuevo registro en el CSV"""
     # Normalizar vector a 0 y 1
     vector_normalizado = (vector_binario / 255).astype(int)
     
-    # Combinar vector y dedos
-    datos_completos = np.append(vector_normalizado, dedos)
+    # Combinar datos en el orden: clase, dedos, trayectoria
+    datos_completos = [clase] + dedos.tolist() + vector_normalizado.tolist()
     
-    # Generar encabezados
-    encabezados = generar_encabezados(len(vector_normalizado))
+    # Leer CSV existente
+    if os.path.exists(archivo_csv):
+        df = pd.read_csv(archivo_csv)
+    else:
+        encabezados = generar_encabezados()
+        df = pd.DataFrame(columns=encabezados)
     
-    # Crear DataFrame con encabezados
-    df = pd.DataFrame([datos_completos], columns=encabezados)
+    # Agregar nueva fila
+    nueva_fila = pd.DataFrame([datos_completos], columns=df.columns)
+    df = pd.concat([df, nueva_fila], ignore_index=True)
     
-    # Guardar como CSV
-    df.to_csv(nombre_archivo, index=False)
+    # Guardar CSV
+    df.to_csv(archivo_csv, index=False)
     
-    print(f"\nDatos exportados a: {nombre_archivo}")
-    print(f"Dimensión total: {len(datos_completos)} elementos")
-    print(f"   - Trayectoria (pixels): {len(vector_normalizado)} elementos")
-    print(f"   - Dedos: {len(dedos)} elementos")
-    
-    # Mostrar estructura del archivo
-    print(f"\nESTRUCTURA DEL ARCHIVO CSV:")
-    print(f"   Columnas 1-{len(vector_normalizado)}: Pixels de la trayectoria (20x20)")
-    print(f"   Columnas {len(vector_normalizado)+1}-{len(datos_completos)}: Estado de los dedos")
-    
-    return datos_completos, encabezados
+    return datos_completos
 
-def mostrar_estructura_datos(vector_binario, dedos, encabezados):
+def mostrar_estructura_datos(clase, dedos, vector_binario):
     """Muestra la estructura completa de los datos"""
     print("\n" + "="*60)
-    print("ESTRUCTURA COMPLETA DE DATOS")
+    print("🏗️  ESTRUCTURA COMPLETA DE DATOS")
     print("="*60)
     
-    print(f"\nSECCIÓN 1: TRAYECTORIA (PIXELS)")
-    print(f"   Columnas: 1 a {len(vector_binario)}")
-    print(f"   Formato: {int(np.sqrt(len(vector_binario)))}x{int(np.sqrt(len(vector_binario)))} pixels")
-    print(f"   Rango de valores: 0 (blanco) o 1 (negro)")
+    print(f"\n📊 SECCIÓN 1: CLASE")
+    print(f"   Columna: 1")
+    print(f"   Valor: '{clase}'")
     
-    print(f"\nSECCIÓN 2: CONFIGURACIÓN DE DEDOS")
-    print(f"   Columnas: {len(vector_binario)+1} a {len(vector_binario)+len(dedos)}")
+    print(f"\n📊 SECCIÓN 2: CONFIGURACIÓN DE DEDOS")
+    print(f"   Columnas: 2 a 6")
     print(f"   Dedos: {list(zip(['Pulgar', 'Índice', 'Medio', 'Anular', 'Meñique'], dedos))}")
     print(f"   Valores: 0 (cerrado) o 1 (abierto)")
     
-    print(f"\nEJEMPLO DE DATOS:")
-    print(f"   Primera columna: {encabezados[0]} = {vector_binario[0] // 255}")
-    print(f"   Última columna: {encabezados[-1]} = {dedos[-1]}")
-    print(f"   Total de características: {len(vector_binario) + len(dedos)}")
+    print(f"\n📊 SECCIÓN 3: TRAYECTORIA (PIXELS)")
+    print(f"   Columnas: 7 a 406")
+    print(f"   Formato: 20x20 pixels")
+    print(f"   Rango de valores: 0 (blanco) o 1 (negro)")
+    
+    print(f"\n🔍 EJEMPLO DE DATOS:")
+    print(f"   Primera columna (clase): '{clase}'")
+    print(f"   Columna 2 (dedo_pulgar): {dedos[0]}")
+    print(f"   Última columna (pixel_19_19): {vector_binario[-1] // 255}")
+    print(f"   Total de características: {1 + len(dedos) + len(vector_binario)}")
 
-# Configuración principal
+def cambiar_clase():
+    """Permite cambiar la clase actual mediante input"""
+    global clase_actual
+    print(f"\n📝 CLASE ACTUAL: '{clase_actual}'")
+    nueva_clase = input("   Ingrese nueva clase (o Enter para mantener actual): ").strip()
+    if nueva_clase:
+        clase_actual = nueva_clase
+        print(f"   ✅ Nueva clase establecida: '{clase_actual}'")
+    else:
+        print(f"   🔄 Manteniendo clase: '{clase_actual}'")
+    return clase_actual
+
+# Inicializar sistema
+inicializar_csv()
 cap = cv2.VideoCapture(0)
-print("Iniciando sistema de captura LSM...")
-print("La grabación comenzará cuando detecte tu mano")
-print("Se detendrá cuando no detecte mano por 1 segundo")
+
+print("\n🎮 CONTROLES:")
+print("   C - Cambiar clase actual")
+print("   G - Guardar gesto actual en CSV")
+print("   ESC - Salir del programa")
+print(f"\n📝 CLASE INICIAL: '{clase_actual}'")
 
 with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidence=0.7) as hands:
     ultima_deteccion = time.time()
     pizarra_actual = crear_pizarron([], 'Esperando')
     vector_actual = None
     matriz_actual = None
-    datos_completos_actual = None
-    encabezados_actual = None
     
     # Estructuras para almacenar datos durante la grabación
     centroides_trayectoria = []
@@ -294,7 +292,7 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             frames_video = []
             centroides_trayectoria = []
             estados_dedos_trayectoria = []
-            print("¡Mano detectada! Comenzando grabación...")
+            print("🟢 ¡Mano detectada! Comenzando grabación...")
         
         if grabando:
             if mano_actualmente_detectada:
@@ -313,24 +311,23 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             else:
                 if time.time() - ultima_deteccion > 1.0:
                     grabando = False
-                    print(f"Grabación terminada. {len(frames_video)} frames capturados")
+                    print(f"🔴 Grabación terminada. {len(frames_video)} frames capturados")
                     
                     if len(frames_video) > 0 and len(centroides_trayectoria) > 0:
-                        print("Procesando datos...")
+                        print("🔄 Procesando datos...")
                         
                         # Estandarizar centroides
                         centroides_20 = estandarizar_frames(centroides_trayectoria, 20)
-                        print(f"Centroides estandarizados: {len(centroides_20)} frames")
+                        print(f"📊 Centroides estandarizados: {len(centroides_20)} frames")
                         
                         # Obtener frames medios
                         centroides_medios = obtener_frames_medios(centroides_20, 5)
-                        print(f"Frames medios seleccionados: {len(centroides_medios)}")
+                        print(f"🎯 Frames medios seleccionados: {len(centroides_medios)}")
                         
                         # Crear pizarrón
                         pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Media')
                         
                         # Convertir a vector binario
-                        print("\nConvirtiendo a vector binario...")
                         vector_binario, matriz_binaria = pizarron_a_vector_binario(pizarra_actual)
                         
                         # Obtener estado de dedos predominante
@@ -339,28 +336,20 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         else:
                             dedos_predominantes = estado_dedos_actual
                         
-                        # VISUALIZAR EN CONSOLA
-                        print("\n" + "="*60)
-                        print("DATOS COMPLETOS DEL GESTO CAPTURADO")
-                        print("="*60)
+                        # Guardar en CSV automáticamente
+                        datos_guardados = guardar_en_csv(clase_actual, dedos_predominantes, vector_binario)
                         
-                        # Mostrar vector
-                        visualizar_vector_consola(vector_binario)
+                        print(f"\n💾 Gesto guardado en CSV:")
+                        print(f"   Clase: '{clase_actual}'")
+                        print(f"   Dedos: {dedos_predominantes}")
+                        print(f"   Trayectoria: {len(vector_binario)} pixels")
                         
-                        # Mostrar dedos
-                        mostrar_dedos_consola(dedos_predominantes)
-                        
-                        # Exportar datos completos con encabezados
-                        datos_completos, encabezados = exportar_datos_completos(vector_binario, dedos_predominantes)
-                        
-                        # Mostrar estructura completa
-                        mostrar_estructura_datos(vector_binario, dedos_predominantes, encabezados)
+                        # Mostrar estructura
+                        mostrar_estructura_datos(clase_actual, dedos_predominantes, vector_binario)
                         
                         # Guardar para mostrar en ventanas
                         vector_actual = vector_binario
                         matriz_actual = matriz_binaria
-                        datos_completos_actual = datos_completos
-                        encabezados_actual = encabezados
                         
                         # Mostrar imagen binaria
                         cv2.imshow('Imagen Binaria', matriz_binaria)
@@ -396,33 +385,48 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                 # Mostrar centroide
                 if centroide_pos:
                     cv2.circle(frame, centroide_pos, 4, color_estado, -1)
-                
-                # Mostrar estado de dedos en pantalla
-                dedos_texto = f"Dedos: {''.join([str(d) for d in dedos_actuales])}"
-                cv2.putText(frame, dedos_texto, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-        
-        # Actualizar estado anterior
-        mano_detectada_anteriormente = mano_actualmente_detectada
         
         # Mostrar información en pantalla
         cv2.putText(frame, estado_texto, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_estado, 2)
         cv2.putText(frame, f"Frames: {len(frames_video)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(frame, f"Clase: {clase_actual}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        
+        if estado_dedos_actual is not None:
+            dedos_texto = f"Dedos: {''.join([str(d) for d in estado_dedos_actual])}"
+            cv2.putText(frame, dedos_texto, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
         if vector_actual is not None:
             info_vector = f"Vector: {vector_actual.shape}"
-            cv2.putText(frame, info_vector, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+            cv2.putText(frame, info_vector, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         
         # Mostrar ventanas
         cv2.imshow('Trayectoria Media', pizarra_actual)
         cv2.imshow('Camara LSM', frame)
         
-        if cv2.waitKey(1) & 0xFF == 27:
+        # Manejo de teclas
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('c') or key == ord('C'):
+            cambiar_clase()
+        elif key == ord('g') or key == ord('G'):
+            if vector_actual is not None and estado_dedos_actual is not None:
+                datos_guardados = guardar_en_csv(clase_actual, estado_dedos_actual, vector_actual)
+                print(f"💾 Gesto guardado manualmente - Clase: '{clase_actual}'")
+        
+        # Actualizar estado anterior
+        mano_detectada_anteriormente = mano_actualmente_detectada
 
-# Limpieza final
-import shutil
-if os.path.exists('temp_frames'):
-    shutil.rmtree('temp_frames')
+# Estadísticas finales
+if os.path.exists(archivo_csv):
+    df = pd.read_csv(archivo_csv)
+    print(f"\n📈 ESTADÍSTICAS FINALES:")
+    print(f"   Total de gestos guardados: {len(df)}")
+    print(f"   Clases registradas: {df['clase'].unique().tolist()}")
+    for clase in df['clase'].unique():
+        count = len(df[df['clase'] == clase])
+        print(f"     - '{clase}': {count} gestos")
 
+print("👋 Programa terminado")
 cap.release()
 cv2.destroyAllWindows()
