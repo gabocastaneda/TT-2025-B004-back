@@ -22,7 +22,7 @@ grabando = False
 mano_detectada_anteriormente = False
 estado_dedos_actual = []
 archivo_csv = "dataset_lsm.csv"
-clase_actual = "Hola"  
+clase_actual = " "  
 
 def centroide(lista_coordenadas):
     coordenadas = np.array(lista_coordenadas)
@@ -187,19 +187,19 @@ def inicializar_csv():
         encabezados = generar_encabezados()
         df = pd.DataFrame(columns=encabezados)
         df.to_csv(archivo_csv, index=False)
-        print(f"📁 Archivo CSV creado: {archivo_csv}")
-        print(f"📊 Estructura: Clase + 5 dedos + 400 pixels = 406 columnas")
+        print(f"Archivo CSV creado: {archivo_csv}")
+        print(f"Estructura: Clase + 5 dedos + 400 pixels = 406 columnas")
     else:
-        print(f"📁 Archivo CSV existente: {archivo_csv}")
-        print(f"📝 Se agregarán nuevos registros al final")
+        print(f"Archivo CSV existente: {archivo_csv}")
+        print(f"Se agregarán nuevos registros al final")
 
 def guardar_en_csv(clase, dedos, vector_binario):
     """Guarda un nuevo registro en el CSV"""
-    # Normalizar vector a 0 y 1
-    vector_normalizado = (vector_binario / 255).astype(int)
+    # CORREGIDO: Mantener los valores originales 0 y 255, no normalizar a 0 y 1
+    # vector_binario ya contiene 0 y 255, lo usamos directamente
     
     # Combinar datos en el orden: clase, dedos, trayectoria
-    datos_completos = [clase] + dedos.tolist() + vector_normalizado.tolist()
+    datos_completos = [clase] + dedos.tolist() + vector_binario.tolist()
     
     # Leer CSV existente
     if os.path.exists(archivo_csv):
@@ -215,38 +215,16 @@ def guardar_en_csv(clase, dedos, vector_binario):
     # Guardar CSV
     df.to_csv(archivo_csv, index=False)
     
+    # Verificar valores únicos en el vector guardado
+    valores_unicos = np.unique(vector_binario)
+    print(f"Valores únicos en el vector: {valores_unicos}")
+    
     return datos_completos
-
-def mostrar_estructura_datos(clase, dedos, vector_binario):
-    """Muestra la estructura completa de los datos"""
-    print("\n" + "="*60)
-    print("🏗️  ESTRUCTURA COMPLETA DE DATOS")
-    print("="*60)
-    
-    print(f"\n📊 SECCIÓN 1: CLASE")
-    print(f"   Columna: 1")
-    print(f"   Valor: '{clase}'")
-    
-    print(f"\n📊 SECCIÓN 2: CONFIGURACIÓN DE DEDOS")
-    print(f"   Columnas: 2 a 6")
-    print(f"   Dedos: {list(zip(['Pulgar', 'Índice', 'Medio', 'Anular', 'Meñique'], dedos))}")
-    print(f"   Valores: 0 (cerrado) o 1 (abierto)")
-    
-    print(f"\n📊 SECCIÓN 3: TRAYECTORIA (PIXELS)")
-    print(f"   Columnas: 7 a 406")
-    print(f"   Formato: 20x20 pixels")
-    print(f"   Rango de valores: 0 (blanco) o 1 (negro)")
-    
-    print(f"\n🔍 EJEMPLO DE DATOS:")
-    print(f"   Primera columna (clase): '{clase}'")
-    print(f"   Columna 2 (dedo_pulgar): {dedos[0]}")
-    print(f"   Última columna (pixel_19_19): {vector_binario[-1] // 255}")
-    print(f"   Total de características: {1 + len(dedos) + len(vector_binario)}")
 
 def cambiar_clase():
     """Permite cambiar la clase actual mediante input"""
     global clase_actual
-    print(f"\n📝 CLASE ACTUAL: '{clase_actual}'")
+    print(f"\nCLASE ACTUAL: '{clase_actual}'")
     nueva_clase = input("   Ingrese nueva clase (o Enter para mantener actual): ").strip()
     if nueva_clase:
         clase_actual = nueva_clase
@@ -259,11 +237,11 @@ def cambiar_clase():
 inicializar_csv()
 cap = cv2.VideoCapture(0)
 
-print("\n🎮 CONTROLES:")
+print("\nCONTROLES:")
 print("   C - Cambiar clase actual")
 print("   G - Guardar gesto actual en CSV")
 print("   ESC - Salir del programa")
-print(f"\n📝 CLASE INICIAL: '{clase_actual}'")
+print(f"\nCLASE INICIAL: '{clase_actual}'")
 
 with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidence=0.7) as hands:
     ultima_deteccion = time.time()
@@ -292,7 +270,7 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             frames_video = []
             centroides_trayectoria = []
             estados_dedos_trayectoria = []
-            print("🟢 ¡Mano detectada! Comenzando grabación...")
+            print("¡Mano detectada! Comenzando grabación...")
         
         if grabando:
             if mano_actualmente_detectada:
@@ -311,18 +289,18 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             else:
                 if time.time() - ultima_deteccion > 1.0:
                     grabando = False
-                    print(f"🔴 Grabación terminada. {len(frames_video)} frames capturados")
+                    print(f"Grabación terminada. {len(frames_video)} frames capturados")
                     
                     if len(frames_video) > 0 and len(centroides_trayectoria) > 0:
-                        print("🔄 Procesando datos...")
+                        print("Procesando datos...")
                         
                         # Estandarizar centroides
                         centroides_20 = estandarizar_frames(centroides_trayectoria, 20)
-                        print(f"📊 Centroides estandarizados: {len(centroides_20)} frames")
+                        # print(f"Centroides estandarizados: {len(centroides_20)} frames")
                         
                         # Obtener frames medios
                         centroides_medios = obtener_frames_medios(centroides_20, 5)
-                        print(f"🎯 Frames medios seleccionados: {len(centroides_medios)}")
+                        # print(f"Frames medios seleccionados: {len(centroides_medios)}")
                         
                         # Crear pizarrón
                         pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Media')
@@ -339,13 +317,10 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         # Guardar en CSV automáticamente
                         datos_guardados = guardar_en_csv(clase_actual, dedos_predominantes, vector_binario)
                         
-                        print(f"\n💾 Gesto guardado en CSV:")
+                        print(f"\nGesto guardado en CSV:")
                         print(f"   Clase: '{clase_actual}'")
                         print(f"   Dedos: {dedos_predominantes}")
                         print(f"   Trayectoria: {len(vector_binario)} pixels")
-                        
-                        # Mostrar estructura
-                        mostrar_estructura_datos(clase_actual, dedos_predominantes, vector_binario)
                         
                         # Guardar para mostrar en ventanas
                         vector_actual = vector_binario
@@ -396,8 +371,10 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             cv2.putText(frame, dedos_texto, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
         if vector_actual is not None:
-            info_vector = f"Vector: {vector_actual.shape}"
-            cv2.putText(frame, info_vector, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+            # Mostrar información del vector actual
+            valores_unicos = np.unique(vector_actual)
+            info_vector = f"Vector: {vector_actual.shape} - Valores: {valores_unicos}"
+            # cv2.putText(frame, info_vector, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         
         # Mostrar ventanas
         cv2.imshow('Trayectoria Media', pizarra_actual)
@@ -420,13 +397,16 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
 # Estadísticas finales
 if os.path.exists(archivo_csv):
     df = pd.read_csv(archivo_csv)
-    print(f"\n📈 ESTADÍSTICAS FINALES:")
+    print(f"\nESTADÍSTICAS FINALES:")
     print(f"   Total de gestos guardados: {len(df)}")
     print(f"   Clases registradas: {df['clase'].unique().tolist()}")
-    for clase in df['clase'].unique():
-        count = len(df[df['clase'] == clase])
-        print(f"     - '{clase}': {count} gestos")
+    
+    # Verificar valores en las columnas de pixels
+    pixel_columns = [col for col in df.columns if col.startswith('pixel_')]
+    if len(pixel_columns) > 0:
+        primeros_pixels = df[pixel_columns[0]].unique()
+        print(f"   Valores únicos en columnas de pixels: {primeros_pixels}")
 
-print("👋 Programa terminado")
+print("Programa terminado")
 cap.release()
 cv2.destroyAllWindows()
