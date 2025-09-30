@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 import time
 import os
-from sklearn.preprocessing import MinMaxScaler
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -45,14 +44,12 @@ def estandarizar_frames(frames, num_frames_deseado=20):
     if len(frames) == num_frames_deseado:
         return frames
     
-    # Si hay menos frames de los deseados, repetimos el último frame
     if len(frames) < num_frames_deseado:
         frames_estandarizados = frames.copy()
         while len(frames_estandarizados) < num_frames_deseado:
             frames_estandarizados.append(frames[-1])
         return frames_estandarizados
     
-    # Si hay más frames, seleccionamos equitativamente
     indices = np.linspace(0, len(frames)-1, num_frames_deseado, dtype=int)
     return [frames[i] for i in indices]
 
@@ -66,28 +63,23 @@ def obtener_frames_medios(centroides, num_frames=5):
 
 def crear_pizarron(trayectoria, nombre):
     if trayectoria:
-        # Convertir a numpy array para facilidad de procesamiento
         puntos = np.array(trayectoria)
         
-        # Encontrar bounding box de la trayectoria
         x_min, y_min = np.min(puntos, axis=0)
         x_max, y_max = np.max(puntos, axis=0)
         
-        ancho = max(x_max - x_min + 40, 50)  # Mínimo 50px de ancho
-        alto = max(y_max - y_min + 40, 50)   # Mínimo 50px de alto
+        ancho = max(x_max - x_min + 40, 50)
+        alto = max(y_max - y_min + 40, 50)
         
         pizarron = 255 * np.ones((alto, ancho, 3), dtype=np.uint8)
         
-        # Centrar la trayectoria en el pizarrón
         puntos_recentrados = [((x - x_min + 20), (y - y_min + 20)) for (x, y) in trayectoria]
         
-        # Dibujar la trayectoria
         for i in range(1, len(puntos_recentrados)):
             pt1 = puntos_recentrados[i - 1]
             pt2 = puntos_recentrados[i]
             cv2.line(pizarron, pt1, pt2, (0, 0, 0), 2)
         
-        # Dibujar puntos para mejor visualización
         for punto in puntos_recentrados:
             cv2.circle(pizarron, punto, 2, (255, 0, 0), -1)
         
@@ -100,18 +92,87 @@ def crear_pizarron(trayectoria, nombre):
     
     return pizarron
 
+def pizarron_a_vector_binario(pizarron, tamano_salida=(20, 20), umbral=128):
+    """
+    Convierte el pizarrón a un vector binario (0 y 255)
+    Usamos 20x20 para que sea más fácil visualizar en consola
+    """
+    # Convertir a escala de grises
+    gris = cv2.cvtColor(pizarron, cv2.COLOR_BGR2GRAY)
+    
+    # Redimensionar al tamaño deseado (más pequeño para consola)
+    gris_redim = cv2.resize(gris, tamano_salida)
+    
+    # Aplicar umbral para binarizar
+    _, binaria = cv2.threshold(gris_redim, umbral, 255, cv2.THRESH_BINARY)
+    
+    # Convertir a vector 1D
+    vector_binario = binaria.flatten()
+    
+    return vector_binario, binaria
+
+def visualizar_vector_consola(vector_binario, tamano_original=(20, 20), caracter_activo='█', caracter_inactivo=' '):
+    """
+    Visualiza el vector binario en la consola usando caracteres ASCII
+    """
+    # Reformar a matriz 2D
+    matriz = vector_binario.reshape(tamano_original)
+    
+    print("\n" + "="*60)
+    print("VISUALIZACIÓN DEL VECTOR EN CONSOLA")
+    print("="*60)
+    
+    # Mostrar matriz visual
+    print(f"\nRepresentación visual ({tamano_original[0]}x{tamano_original[1]}):")
+    print("┌" + "─" * (tamano_original[1] * 2) + "┐")
+    for i in range(tamano_original[0]):
+        fila_str = "│"
+        for j in range(tamano_original[1]):
+            if matriz[i, j] == 255:
+                fila_str += caracter_activo * 2
+            else:
+                fila_str += caracter_inactivo * 2
+        fila_str += "│"
+        print(fila_str)
+    print("└" + "─" * (tamano_original[1] * 2) + "┘")
+    
+    # Mostrar estadísticas
+    total_elementos = len(vector_binario)
+    elementos_activos = np.sum(vector_binario == 255)
+    elementos_inactivos = np.sum(vector_binario == 0)
+    
+    print(f"\nEstadísticas del vector:")
+    print(f"   Tamaño total: {total_elementos} elementos")
+    print(f"   Píxeles activos (255): {elementos_activos} ({elementos_activos/total_elementos*100:.1f}%)")
+    print(f"   Píxeles inactivos (0): {elementos_inactivos} ({elementos_inactivos/total_elementos*100:.1f}%)")
+    
+    return matriz
+
+def exportar_vector_csv(vector_binario, nombre_archivo="vector_gesto.csv"):
+    """
+    Exporta el vector a un archivo CSV
+    """
+    # Normalizar a 0 y 1 para mayor legibilidad
+    vector_normalizado = (vector_binario / 255).astype(int)
+    
+    # Guardar como CSV
+    np.savetxt(nombre_archivo, vector_normalizado.reshape(1, -1), delimiter=',', fmt='%d')
+    print(f"\n💾 Vector exportado a: {nombre_archivo}")
+
 # Crear carpeta para guardar frames temporales si no existe
 if not os.path.exists('temp_frames'):
     os.makedirs('temp_frames')
 
 cap = cv2.VideoCapture(0)
-print("🎥 Iniciando detección de mano...")
-print("🟢 La grabación comenzará cuando detecte tu mano")
-print("🔴 Se detendrá cuando no detecte mano por 1 segundo")
+print("Iniciando detección de mano...")
+print("La grabación comenzará cuando detecte tu mano")
+print("Se detendrá cuando no detecte mano por 1 segundo")
 
 with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidence=0.7) as hands:
     ultima_deteccion = time.time()
     pizarra_actual = crear_pizarron([], 'Esperando')
+    vector_actual = None
+    matriz_actual = None
     
     while True:
         ret, frame = cap.read()
@@ -126,59 +187,68 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
         
         # Lógica de inicio/fin de grabación
         if not grabando and mano_actualmente_detectada and not mano_detectada_anteriormente:
-            # Iniciar grabación
             grabando = True
             frames_video = []
-            print("🟢 ¡Mano detectada! Comenzando grabación...")
+            print("¡Mano detectada! Comenzando grabación...")
         
         if grabando:
             if mano_actualmente_detectada:
                 ultima_deteccion = time.time()
-                # Guardar frame actual
                 frames_video.append(frame.copy())
                 estado_texto = f"GRABANDO: {len(frames_video)} frames"
                 color_estado = (0, 255, 0)
             else:
-                # Verificar si ha pasado más de 1 segundo sin detección
                 if time.time() - ultima_deteccion > 1.0:
                     grabando = False
-                    print(f"🔴 Grabación terminada. {len(frames_video)} frames capturados")
+                    print(f"Grabación terminada. {len(frames_video)} frames capturados")
                     
-                    # Procesar el video capturado
                     if len(frames_video) > 0:
-                        print("🔄 Procesando frames...")
+                        print("Procesando frames...")
                         
-                        # Extraer centroides de todos los frames
                         centroides_todos = []
                         for frame_vid in frames_video:
                             centroide_frame = extraer_centroide_frame(frame_vid, hands)
                             if centroide_frame is not None:
                                 centroides_todos.append(centroide_frame)
                         
-                        # Estandarizar a 20 frames
                         centroides_20 = estandarizar_frames(centroides_todos, 20)
-                        print(f"📊 Centroides estandarizados: {len(centroides_20)} frames")
+                        print(f" Centroides estandarizados: {len(centroides_20)} frames")
                         
-                        # Obtener los 5 frames del medio
                         centroides_medios = obtener_frames_medios(centroides_20, 5)
-                        print(f"🎯 Frames medios seleccionados: {len(centroides_medios)}")
+                        print(f"Frames medios seleccionados: {len(centroides_medios)}")
                         
-                        # Crear pizarra con los frames medios
                         pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Media')
                         
-                    estado_texto = f"PROCESADO: {len(centroides_medios) if 'centroides_medios' in locals() else 0} puntos"
+                        # CONVERTIR PIZARRÓN A VECTOR BINARIO
+                        print("\nConvirtiendo pizarrón a vector binario...")
+                        vector_binario, matriz_binaria = pizarron_a_vector_binario(pizarra_actual, tamano_salida=(20, 20))
+                        
+                        # VISUALIZAR EN CONSOLA
+                        matriz_visual = visualizar_vector_consola(vector_binario, tamano_original=(20, 20))
+                        
+                        # Exportar a CSV
+                        exportar_vector_csv(vector_binario)
+                        
+                        # Guardar para mostrar en ventanas
+                        vector_actual = vector_binario
+                        matriz_actual = matriz_binaria
+                        
+                        # Mostrar imagen binaria
+                        cv2.imshow('Imagen Binaria', matriz_binaria)
+                        
+                    estado_texto = f"PROCESADO"
                     color_estado = (255, 0, 0)
                 else:
                     estado_texto = f"GRABANDO: {len(frames_video)} frames (sin mano)"
-                    color_estado = (0, 165, 255)  # Naranja
+                    color_estado = (0, 165, 255)
         
         else:
             if mano_actualmente_detectada:
                 estado_texto = "LISTO - Mueve la mano para comenzar"
-                color_estado = (0, 255, 255)  # Amarillo
+                color_estado = (0, 255, 255)
             else:
                 estado_texto = "ESPERANDO MANO..."
-                color_estado = (0, 0, 255)  # Rojo
+                color_estado = (0, 0, 255)
         
         # Dibujar landmarks si hay mano detectada
         if results.multi_hand_landmarks:
@@ -190,7 +260,6 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                     mp_drawing_styles.get_default_hand_landmarks_style(),
                     mp_drawing_styles.get_default_hand_connections_style())
                 
-                # Mostrar centroide en tiempo real
                 coordenadas_palma = []
                 for i in puntos_palma:
                     x = int(hand_landmarks.landmark[i].x * frame.shape[1])
@@ -208,7 +277,12 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
         cv2.putText(frame, estado_texto, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_estado, 2)
         cv2.putText(frame, f"Frames: {len(frames_video)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         
-        # Mostrar pizarra
+        # Mostrar información del vector si está disponible
+        if vector_actual is not None:
+            info_vector = f"Vector: {vector_actual.shape}"
+            cv2.putText(frame, info_vector, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+        
+        # Mostrar pizarra y ventanas
         cv2.imshow('Trayectoria Media', pizarra_actual)
         cv2.imshow('Camara LSM', frame)
         
