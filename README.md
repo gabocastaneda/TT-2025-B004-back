@@ -1,4 +1,3 @@
-
 # Sistema de Captura y Registro de Gestos Manuales
 
 Este proyecto permite capturar gestos de manos en tiempo real, extraer su trayectoria y el estado de los dedos, y almacenar estos datos estructurados en un archivo CSV, utilizando MediaPipe y OpenCV en Python.
@@ -32,7 +31,7 @@ El sistema detecta una mano desde la cámara, extrae la posición del centroide 
 
 1. Ejecuta el script principal:
    ```
-   python test2.py
+   python data.py
    ```
 2. Siga las instrucciones en consola:
    - C: Cambiar clase actual
@@ -50,5 +49,3 @@ Los datos se guardan en el archivo `datasetlsm.csv`. Al finalizar, se muestran e
 ## Créditos
 
 Desarrollado con OpenCV y MediaPipe, inspirado por soluciones y tutoriales de visión artificial y reconocimiento de lenguaje de señas en Python.
-
-
