@@ -22,7 +22,7 @@ grabando = False
 mano_detectada_anteriormente = False
 estado_dedos_actual = []
 archivo_csv = "dataset_lsm.csv"
-clase_actual = " "  
+clase_actual = "e"  
 
 def centroide(lista_coordenadas):
     coordenadas = np.array(lista_coordenadas)
