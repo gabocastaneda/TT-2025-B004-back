@@ -5,6 +5,7 @@ import time
 import os
 import pandas as pd
 from math import acos, degrees
+import joblib
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -20,9 +21,11 @@ puntas = [8, 12, 16, 20]
 frames_video = []
 grabando = False
 mano_detectada_anteriormente = False
-estado_dedos_actual = []
-archivo_csv = "dataset_lsm.csv"
-clase_actual = "Hola"  
+estado_dedos_actual = np.array([0, 0, 0, 0, 0])
+
+# Modelos
+modelo_dedos = None
+modelo_trayectoria = None
 
 def centroide(lista_coordenadas):
     coordenadas = np.array(lista_coordenadas)
@@ -70,25 +73,32 @@ def detectar_dedos(hand_landmarks, width, height):
     l2 = np.linalg.norm(p1 - p3)
     l3 = np.linalg.norm(p1 - p2)
     
+    # Evitar división por cero
     if l1 * l3 == 0:
         angle = 0
     else:
-        angle = degrees(acos((l1**2 + l3**2 - l2**2) / (2 * l1 * l3)))
+        cos_angle = (l1**2 + l3**2 - l2**2) / (2 * l1 * l3)
+        cos_angle = np.clip(cos_angle, -1, 1)
+        angle = degrees(acos(cos_angle))
     
     dedo_pulgar = 1 if angle > 150 else 0
     
     # Detectar otros dedos (índice, medio, anular, meñique)
-    nx, ny = centroide(coordenadas_palma)
-    coordenadas_centroide = np.array([nx, ny])
-    coordenadas_bases = np.array(coordenadas_bases)
-    coordenadas_puntas = np.array(coordenadas_puntas)
-    
-    dis_centroid_puntas = np.linalg.norm(coordenadas_centroide - coordenadas_puntas, axis=1)
-    dis_centroid_bases = np.linalg.norm(coordenadas_centroide - coordenadas_bases, axis=1)
-    diferencia = dis_centroid_puntas - dis_centroid_bases
-    
-    dedos = (diferencia > 0).astype(int)
-    dedos = np.append(dedo_pulgar, dedos)
+    if len(coordenadas_palma) > 0:
+        nx, ny = centroide(coordenadas_palma)
+        coordenadas_centroide = np.array([nx, ny])
+        coordenadas_bases = np.array(coordenadas_bases)
+        coordenadas_puntas = np.array(coordenadas_puntas)
+        
+        dis_centroid_puntas = np.linalg.norm(coordenadas_centroide - coordenadas_puntas, axis=1)
+        dis_centroid_bases = np.linalg.norm(coordenadas_centroide - coordenadas_bases, axis=1)
+        diferencia = dis_centroid_puntas - dis_centroid_bases
+        
+        dedos = (diferencia > 0).astype(int)
+        dedos = np.append(dedo_pulgar, dedos)
+    else:
+        dedos = np.array([dedo_pulgar, 0, 0, 0, 0])
+        nx, ny = 0, 0
     
     return dedos, (nx, ny)
 
@@ -151,11 +161,9 @@ def crear_pizarron(trayectoria, nombre):
             cv2.circle(pizarron, punto, 2, (255, 0, 0), -1)
         
         pizarron = cv2.resize(pizarron, (200, 200)) 
-        print(f"{nombre}: {len(puntos_recentrados)} puntos dibujados.")
     else:
         pizarron = 255 * np.ones((200, 200, 3), dtype=np.uint8)
         cv2.putText(pizarron, "Sin datos", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 1)
-        print(f"{nombre}: sin trayectoria.")
     
     return pizarron
 
@@ -166,91 +174,126 @@ def pizarron_a_vector_binario(pizarron, tamano_salida=(20, 20), umbral=128):
     _, binaria = cv2.threshold(gris_redim, umbral, 255, cv2.THRESH_BINARY)
     vector_binario = binaria.flatten()
     
-    return vector_binario, binaria
+    # Normalizar a 0 y 1 (como se hizo en el entrenamiento)
+    vector_binario_normalizado = (vector_binario / 255.0).astype(np.float64)
+    
+    return vector_binario_normalizado, binaria
 
-def generar_encabezados(tamano_vector=400):
-    """Genera encabezados descriptivos para las columnas"""
-    encabezados = ["clase"]
+def cargar_modelos():
+    """Carga ambos modelos entrenados"""
+    global modelo_dedos, modelo_trayectoria
     
-    # Encabezados para los dedos
-    nombres_dedos = ["pulgar", "indice", "medio", "anular", "menique"]
-    for dedo in nombres_dedos:
-        encabezados.append(f"dedo_{dedo}")
-    
-    # Encabezados para el vector de trayectoria (20x20 = 400 elementos)
-    for i in range(tamano_vector):
-        fila = i // 20
-        columna = i % 20
-        encabezados.append(f"pixel_{fila:02d}_{columna:02d}")
-    
-    return encabezados
+    try:
+        modelo_dedos = joblib.load("modelo_dedos.pkl")
+        modelo_trayectoria = joblib.load("modelo_trayectoria.pkl")
+        print("✅ Modelos cargados exitosamente:")
+        print(f"   - Modelo dedos: {type(modelo_dedos).__name__}")
+        print(f"   - Modelo trayectoria: {type(modelo_trayectoria).__name__}")
+        return True
+    except Exception as e:
+        print(f"❌ Error al cargar modelos: {e}")
+        return False
 
-def inicializar_csv():
-    """Inicializa el archivo CSV con los encabezados"""
-    if not os.path.exists(archivo_csv):
-        encabezados = generar_encabezados()
-        df = pd.DataFrame(columns=encabezados)
-        df.to_csv(archivo_csv, index=False)
-        print(f"Archivo CSV creado: {archivo_csv}")
-        print(f"Estructura: Clase + 5 dedos + 400 pixels = 406 columnas")
+def predecir_con_dedos(dedos):
+    """Predice usando solo la configuración de dedos"""
+    if modelo_dedos is None:
+        return "Desconocido", 0
+    
+    # Asegurar que tenemos 5 dedos
+    if len(dedos) != 5:
+        dedos = np.zeros(5)
+    
+    # Preparar datos para el modelo de dedos
+    X_dedos = np.array([dedos])
+    
+    # Predecir
+    prediccion = modelo_dedos.predict(X_dedos)[0]
+    probabilidades = modelo_dedos.predict_proba(X_dedos)[0]
+    confianza = np.max(probabilidades)
+    
+    return prediccion, confianza
+
+def predecir_con_trayectoria(vector_binario):
+    """Predice usando solo la trayectoria"""
+    if modelo_trayectoria is None:
+        return "Desconocido", 0
+    
+    # Asegurar que tenemos 400 pixels
+    if len(vector_binario) != 400:
+        vector_binario = np.zeros(400)
+    
+    # Preparar datos para el modelo de trayectoria
+    X_trayectoria = np.array([vector_binario])
+    
+    # Predecir
+    prediccion = modelo_trayectoria.predict(X_trayectoria)[0]
+    probabilidades = modelo_trayectoria.predict_proba(X_trayectoria)[0]
+    confianza = np.max(probabilidades)
+    
+    return prediccion, confianza
+
+def predecir_combinado(dedos, vector_binario):
+    """Combina las predicciones de ambos modelos (ponderado por precisión)"""
+    
+    # Predecir con cada modelo
+    pred_dedos, conf_dedos = predecir_con_dedos(dedos)
+    pred_trayectoria, conf_trayectoria = predecir_con_trayectoria(vector_binario)
+    
+    print(f"🔍 Predicciones individuales:")
+    print(f"   - Dedos: '{pred_dedos}' (confianza: {conf_dedos:.2%})")
+    print(f"   - Trayectoria: '{pred_trayectoria}' (confianza: {conf_trayectoria:.2%})")
+    
+    # Estrategia de combinación: preferir dedos (mayor precisión)
+    # Pero si la confianza de trayectoria es muy alta, considerarla
+    if conf_dedos > 0.8:
+        prediccion_final = pred_dedos
+        confianza_final = conf_dedos
+        metodo = "DEDOS (alta confianza)"
+    elif conf_trayectoria > 0.9:
+        prediccion_final = pred_trayectoria
+        confianza_final = conf_trayectoria
+        metodo = "TRAYECTORIA (muy alta confianza)"
+    elif pred_dedos == pred_trayectoria:
+        prediccion_final = pred_dedos
+        confianza_final = (conf_dedos + conf_trayectoria) / 2
+        metodo = "CONSENSO (ambos modelos)"
     else:
-        print(f"Archivo CSV existente: {archivo_csv}")
-        print(f"Se agregarán nuevos registros al final")
+        # Preferir dedos por tener mejor precisión general
+        prediccion_final = pred_dedos
+        confianza_final = conf_dedos
+        metodo = "DEDOS (mejor precisión)"
+    
+    return prediccion_final, confianza_final, metodo, pred_dedos, pred_trayectoria
 
-def guardar_en_csv(clase, dedos, vector_binario):
-    """Guarda un nuevo registro en el CSV"""
-    # normalizar vector a 0 y 1
-    vector_normalizado = (vector_binario / 255.0).astype(np.float64)
-    # Combinar datos en el orden: clase, dedos, trayectoria
-    datos_completos = [clase] + dedos.tolist() + vector_normalizado.tolist()
-    
-    # Leer CSV existente
-    if os.path.exists(archivo_csv):
-        df = pd.read_csv(archivo_csv)
-    else:
-        encabezados = generar_encabezados()
-        df = pd.DataFrame(columns=encabezados)
-    
-    # Agregar nueva fila
-    nueva_fila = pd.DataFrame([datos_completos], columns=df.columns)
-    df = pd.concat([df, nueva_fila], ignore_index=True)
-    
-    # Guardar CSV
-    df.to_csv(archivo_csv, index=False)
-    
-    # Verificar valores únicos en el vector guardado
-    valores_unicos = np.unique(vector_binario)
-    print(f"Valores únicos en el vector: {valores_unicos}")
-    
-    return datos_completos
+# Cargar modelos al inicio
+print("🤖 SISTEMA DE INFERENCIA LSM - MODELOS SEPARADOS")
+print("=" * 50)
 
-def cambiar_clase():
-    """Permite cambiar la clase actual mediante input"""
-    global clase_actual
-    print(f"\nCLASE ACTUAL: '{clase_actual}'")
-    nueva_clase = input("   Ingrese nueva clase (o Enter para mantener actual): ").strip()
-    if nueva_clase:
-        clase_actual = nueva_clase
-        print(f"   ✅ Nueva clase establecida: '{clase_actual}'")
-    else:
-        print(f"   🔄 Manteniendo clase: '{clase_actual}'")
-    return clase_actual
+if not cargar_modelos():
+    print("❌ No se pudieron cargar los modelos. Ejecuta model.py primero.")
+    exit()
 
-# Inicializar sistema
-inicializar_csv()
 cap = cv2.VideoCapture(0)
 
 print("\nCONTROLES:")
-print("   C - Cambiar clase actual")
-print("   G - Guardar gesto actual en CSV")
 print("   ESC - Salir del programa")
-print(f"\nCLASE INICIAL: '{clase_actual}'")
+print("   R - Reiniciar grabación actual")
+print("   D - Mostrar/ocultar detalles de predicción")
+print("\nESTRATEGIA: Se prioriza el modelo de dedos (81.82% precisión) sobre trayectoria (27.27%)")
 
 with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidence=0.7) as hands:
     ultima_deteccion = time.time()
     pizarra_actual = crear_pizarron([], 'Esperando')
     vector_actual = None
     matriz_actual = None
+    
+    # Variables para la predicción
+    ultima_prediccion = "Ninguna"
+    ultima_confianza = 0
+    mostrar_detalles = True
+    metodo_ultimo = ""
+    pred_dedos_ultima = ""
+    pred_trayectoria_ultima = ""
     
     # Estructuras para almacenar datos durante la grabación
     centroides_trayectoria = []
@@ -273,7 +316,7 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             frames_video = []
             centroides_trayectoria = []
             estados_dedos_trayectoria = []
-            print("¡Mano detectada! Comenzando grabación...")
+            print("\n🎥 ¡Mano detectada! Comenzando grabación...")
         
         if grabando:
             if mano_actualmente_detectada:
@@ -292,18 +335,16 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             else:
                 if time.time() - ultima_deteccion > 1.0:
                     grabando = False
-                    print(f"Grabación terminada. {len(frames_video)} frames capturados")
+                    print(f"⏹️  Grabación terminada. {len(frames_video)} frames capturados")
                     
                     if len(frames_video) > 0 and len(centroides_trayectoria) > 0:
-                        print("Procesando datos...")
+                        print("🔄 Procesando datos para predicción...")
                         
                         # Estandarizar centroides
                         centroides_20 = estandarizar_frames(centroides_trayectoria, 20)
-                        # print(f"Centroides estandarizados: {len(centroides_20)} frames")
                         
                         # Obtener frames medios
                         centroides_medios = obtener_frames_medios(centroides_20, 5)
-                        # print(f"Frames medios seleccionados: {len(centroides_medios)}")
                         
                         # Crear pizarrón
                         pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Media')
@@ -314,16 +355,26 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         # Obtener estado de dedos predominante
                         if len(estados_dedos_trayectoria) > 0:
                             dedos_predominantes = np.round(np.mean(estados_dedos_trayectoria, axis=0)).astype(int)
+                            print(f"   Dedos predominantes: {dedos_predominantes}")
                         else:
                             dedos_predominantes = estado_dedos_actual
                         
-                        # Guardar en CSV automáticamente
-                        datos_guardados = guardar_en_csv(clase_actual, dedos_predominantes, vector_binario)
+                        # REALIZAR PREDICCIÓN COMBINADA
+                        print("🤖 Realizando predicción combinada...")
+                        prediccion, confianza, metodo, pred_dedos, pred_trayectoria = predecir_combinado(
+                            dedos_predominantes, vector_binario
+                        )
                         
-                        print(f"\nGesto guardado en CSV:")
-                        print(f"   Clase: '{clase_actual}'")
-                        print(f"   Dedos: {dedos_predominantes}")
-                        print(f"   Trayectoria: {len(vector_binario)} pixels")
+                        ultima_prediccion = prediccion
+                        ultima_confianza = confianza
+                        metodo_ultimo = metodo
+                        pred_dedos_ultima = pred_dedos
+                        pred_trayectoria_ultima = pred_trayectoria
+                        
+                        print(f"\n🎯 PREDICCIÓN FINAL:")
+                        print(f"   Gesto: '{prediccion}'")
+                        print(f"   Confianza: {confianza:.2%}")
+                        print(f"   Método: {metodo}")
                         
                         # Guardar para mostrar en ventanas
                         vector_actual = vector_binario
@@ -332,7 +383,10 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         # Mostrar imagen binaria
                         cv2.imshow('Imagen Binaria', matriz_binaria)
                         
-                    estado_texto = f"PROCESADO"
+                    else:
+                        print("❌ No hay datos suficientes para predicción")
+                    
+                    estado_texto = f"PREDICCIÓN COMPLETADA"
                     color_estado = (255, 0, 0)
                 else:
                     estado_texto = f"GRABANDO: {len(frames_video)} frames (sin mano)"
@@ -358,7 +412,8 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                 
                 # Detectar y mostrar dedos en tiempo real
                 dedos_actuales, centroide_pos = detectar_dedos(hand_landmarks, frame.shape[1], frame.shape[0])
-                estado_dedos_actual = dedos_actuales
+                if dedos_actuales is not None:
+                    estado_dedos_actual = dedos_actuales
                 
                 # Mostrar centroide
                 if centroide_pos:
@@ -367,49 +422,54 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
         # Mostrar información en pantalla
         cv2.putText(frame, estado_texto, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_estado, 2)
         cv2.putText(frame, f"Frames: {len(frames_video)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        cv2.putText(frame, f"Clase: {clase_actual}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        
+        # Mostrar predicción principal
+        color_prediccion = (0, 255, 0) if ultima_confianza > 0.7 else (0, 165, 255) if ultima_confianza > 0.5 else (0, 0, 255)
+        texto_prediccion = f"Pred: '{ultima_prediccion}' ({ultima_confianza:.1%})"
+        cv2.putText(frame, texto_prediccion, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_prediccion, 2)
+        
+        # Mostrar detalles si están activados
+        if mostrar_detalles and ultima_prediccion != "Ninguna":
+            y_offset = 120
+            # cv2.putText(frame, f"Metodo: {metodo_ultimo}", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 0), 1)
+            y_offset += 25
+            # cv2.putText(frame, f"Dedos: '{pred_dedos_ultima}'", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 200), 1)
+            y_offset += 25
+            # cv2.putText(frame, f"Trayec: '{pred_trayectoria_ultima}'", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 0, 200), 1)
         
         if estado_dedos_actual is not None:
             dedos_texto = f"Dedos: {''.join([str(d) for d in estado_dedos_actual])}"
-            cv2.putText(frame, dedos_texto, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            cv2.putText(frame, dedos_texto, (10, frame.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
-        if vector_actual is not None:
-            # Mostrar información del vector actual
-            valores_unicos = np.unique(vector_actual)
-            info_vector = f"Vector: {vector_actual.shape} - Valores: {valores_unicos}"
-            # cv2.putText(frame, info_vector, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+        # Mostrar información de modelos
+        info_modelo = f"Modelos: Dedos(82%) + Trayec(27%)"
+        cv2.putText(frame, info_modelo, (frame.shape[1] - 300, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
         
         # Mostrar ventanas
         cv2.imshow('Trayectoria Media', pizarra_actual)
-        cv2.imshow('Camara LSM', frame)
+        cv2.imshow('Camara LSM - INFERENCIA', frame)
         
         # Manejo de teclas
         key = cv2.waitKey(1) & 0xFF
         if key == 27:  # ESC
             break
-        elif key == ord('c') or key == ord('C'):
-            cambiar_clase()
-        elif key == ord('g') or key == ord('G'):
-            if vector_actual is not None and estado_dedos_actual is not None:
-                datos_guardados = guardar_en_csv(clase_actual, estado_dedos_actual, vector_actual)
-                print(f"💾 Gesto guardado manualmente - Clase: '{clase_actual}'")
+        elif key == ord('r') or key == ord('R'):
+            # Reiniciar grabación
+            grabando = False
+            frames_video = []
+            centroides_trayectoria = []
+            estados_dedos_trayectoria = []
+            ultima_prediccion = "Ninguna"
+            ultima_confianza = 0
+            pizarra_actual = crear_pizarron([], 'Reiniciado')
+            print("🔄 Grabación reiniciada")
+        elif key == ord('d') or key == ord('D'):
+            mostrar_detalles = not mostrar_detalles
+            print(f"🔍 Detalles de predicción: {'ACTIVADOS' if mostrar_detalles else 'DESACTIVADOS'}")
         
         # Actualizar estado anterior
         mano_detectada_anteriormente = mano_actualmente_detectada
 
-# Estadísticas finales
-if os.path.exists(archivo_csv):
-    df = pd.read_csv(archivo_csv)
-    print(f"\nESTADÍSTICAS FINALES:")
-    print(f"   Total de gestos guardados: {len(df)}")
-    print(f"   Clases registradas: {df['clase'].unique().tolist()}")
-    
-    # Verificar valores en las columnas de pixels
-    pixel_columns = [col for col in df.columns if col.startswith('pixel_')]
-    if len(pixel_columns) > 0:
-        primeros_pixels = df[pixel_columns[0]].unique()
-        print(f"   Valores únicos en columnas de pixels: {primeros_pixels}")
-
-print("Programa terminado")
+print("✅ Sistema de inferencia terminado")
 cap.release()
 cv2.destroyAllWindows()
