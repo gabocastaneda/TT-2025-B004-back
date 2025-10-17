@@ -2,3 +2,4 @@
 dataset_lsm.csv
 *.pkl
 __pycache__
+*.png

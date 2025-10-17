@@ -22,7 +22,7 @@ grabando = False
 mano_detectada_anteriormente = False
 estado_dedos_actual = []
 archivo_csv = "dataset_lsm.csv"
-clase_actual = "Hola"  
+clase_actual = ""  
 
 def centroide(lista_coordenadas):
     coordenadas = np.array(lista_coordenadas)
@@ -120,13 +120,13 @@ def estandarizar_frames(frames, num_frames_deseado=20):
     indices = np.linspace(0, len(frames)-1, num_frames_deseado, dtype=int)
     return [frames[i] for i in indices]
 
-def obtener_frames_medios(centroides, num_frames=5):
+def obtener_frames_medios(frames, num_frames=10):
     """Obtiene los frames del medio de la secuencia"""
-    if len(centroides) <= num_frames:
-        return centroides
+    if len(frames) <= num_frames:
+        return frames
     
-    inicio = (len(centroides) - num_frames) // 2
-    return centroides[inicio:inicio + num_frames]
+    inicio = (len(frames) - num_frames) // 2
+    return frames[inicio:inicio + num_frames]
 
 def crear_pizarron(trayectoria, nombre):
     if trayectoria:
@@ -172,10 +172,8 @@ def generar_encabezados(tamano_vector=400):
     """Genera encabezados descriptivos para las columnas"""
     encabezados = ["clase"]
     
-    # Encabezados para los dedos
-    nombres_dedos = ["pulgar", "indice", "medio", "anular", "menique"]
-    for dedo in nombres_dedos:
-        encabezados.append(f"dedo_{dedo}")
+    # Solo una columna para la secuencia de dedos de los frames centrales (5 frames × 5 dedos = 25 valores)
+    encabezados.append("secuencia_dedos_centrales")
     
     # Encabezados para el vector de trayectoria (20x20 = 400 elementos)
     for i in range(tamano_vector):
@@ -192,17 +190,21 @@ def inicializar_csv():
         df = pd.DataFrame(columns=encabezados)
         df.to_csv(archivo_csv, index=False)
         print(f"Archivo CSV creado: {archivo_csv}")
-        print(f"Estructura: Clase + 5 dedos + 400 pixels = 406 columnas")
+        print(f"Estructura: Clase + secuencia_dedos_centrales + 400 pixels = 402 columnas")
     else:
         print(f"Archivo CSV existente: {archivo_csv}")
         print(f"Se agregarán nuevos registros al final")
 
-def guardar_en_csv(clase, dedos, vector_binario):
+def guardar_en_csv(clase, secuencia_dedos_centrales, vector_binario):
     """Guarda un nuevo registro en el CSV"""
-    # normalizar vector a 0 y 1
+    # Normalizar vector a 0 y 1
     vector_normalizado = (vector_binario / 255.0).astype(np.float64)
-    # Combinar datos en el orden: clase, dedos, trayectoria
-    datos_completos = [clase] + dedos.tolist() + vector_normalizado.tolist()
+    
+    # Convertir secuencia de dedos centrales a string para guardar en CSV
+    secuencia_dedos_str = str(secuencia_dedos_centrales.tolist())
+    
+    # Combinar datos en el orden: clase, secuencia_dedos_centrales, trayectoria
+    datos_completos = [clase, secuencia_dedos_str] + vector_normalizado.tolist()
     
     # Leer CSV existente
     if os.path.exists(archivo_csv):
@@ -246,7 +248,7 @@ print("   G - Guardar gesto actual en CSV")
 print("   ESC - Salir del programa")
 print(f"\nCLASE INICIAL: '{clase_actual}'")
 
-with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidence=0.7) as hands:
+with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidence=0.95) as hands:
     ultima_deteccion = time.time()
     pizarra_actual = crear_pizarron([], 'Esperando')
     vector_actual = None
@@ -298,32 +300,31 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         print("Procesando datos...")
                         
                         # Estandarizar centroides
-                        centroides_20 = estandarizar_frames(centroides_trayectoria, 20)
-                        # print(f"Centroides estandarizados: {len(centroides_20)} frames")
+                        centroides_30 = estandarizar_frames(centroides_trayectoria, 30)
                         
-                        # Obtener frames medios
-                        centroides_medios = obtener_frames_medios(centroides_20, 5)
-                        # print(f"Frames medios seleccionados: {len(centroides_medios)}")
+                        # Estandarizar secuencia de dedos
+                        estados_dedos_30 = estandarizar_frames(estados_dedos_trayectoria, 30)
                         
-                        # Crear pizarrón
+                        # Obtener frames medios para ambos (mismo segmento temporal)
+                        centroides_medios = obtener_frames_medios(centroides_30, 30)
+                        estados_dedos_medios = obtener_frames_medios(estados_dedos_30, 30)
+                        
+                        # Convertir a array numpy
+                        secuencia_dedos_array = np.array(estados_dedos_medios)
+                        
+                        # Crear pizarrón con los centroides medios
                         pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Media')
                         
                         # Convertir a vector binario
                         vector_binario, matriz_binaria = pizarron_a_vector_binario(pizarra_actual)
                         
-                        # Obtener estado de dedos predominante
-                        if len(estados_dedos_trayectoria) > 0:
-                            dedos_predominantes = np.round(np.mean(estados_dedos_trayectoria, axis=0)).astype(int)
-                        else:
-                            dedos_predominantes = estado_dedos_actual
-                        
                         # Guardar en CSV automáticamente
-                        datos_guardados = guardar_en_csv(clase_actual, dedos_predominantes, vector_binario)
+                        datos_guardados = guardar_en_csv(clase_actual, secuencia_dedos_array, vector_binario)
                         
                         print(f"\nGesto guardado en CSV:")
                         print(f"   Clase: '{clase_actual}'")
-                        print(f"   Dedos: {dedos_predominantes}")
-                        print(f"   Trayectoria: {len(vector_binario)} pixels")
+                        print(f"   Secuencia dedos centrales: {secuencia_dedos_array.shape} (5 frames x 5 dedos = 25 valores)")
+                        print(f"   Trayectoria: {len(vector_binario)} pixels (de 5 frames centrales)")
                         
                         # Guardar para mostrar en ventanas
                         vector_actual = vector_binario
@@ -373,12 +374,6 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             dedos_texto = f"Dedos: {''.join([str(d) for d in estado_dedos_actual])}"
             cv2.putText(frame, dedos_texto, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
-        if vector_actual is not None:
-            # Mostrar información del vector actual
-            valores_unicos = np.unique(vector_actual)
-            info_vector = f"Vector: {vector_actual.shape} - Valores: {valores_unicos}"
-            # cv2.putText(frame, info_vector, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
-        
         # Mostrar ventanas
         cv2.imshow('Trayectoria Media', pizarra_actual)
         cv2.imshow('Camara LSM', frame)
@@ -391,8 +386,10 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             cambiar_clase()
         elif key == ord('g') or key == ord('G'):
             if vector_actual is not None and estado_dedos_actual is not None:
-                datos_guardados = guardar_en_csv(clase_actual, estado_dedos_actual, vector_actual)
-                print(f"💾 Gesto guardado manualmente - Clase: '{clase_actual}'")
+                # Para guardado manual, crear una secuencia con el estado actual repetido 5 veces
+                secuencia_manual = np.array([estado_dedos_actual] * 5)
+                datos_guardados = guardar_en_csv(clase_actual, secuencia_manual, vector_actual)
+                print(f"Gesto guardado manualmente - Clase: '{clase_actual}'")
         
         # Actualizar estado anterior
         mano_detectada_anteriormente = mano_actualmente_detectada
@@ -404,11 +401,10 @@ if os.path.exists(archivo_csv):
     print(f"   Total de gestos guardados: {len(df)}")
     print(f"   Clases registradas: {df['clase'].unique().tolist()}")
     
-    # Verificar valores en las columnas de pixels
-    pixel_columns = [col for col in df.columns if col.startswith('pixel_')]
-    if len(pixel_columns) > 0:
-        primeros_pixels = df[pixel_columns[0]].unique()
-        print(f"   Valores únicos en columnas de pixels: {primeros_pixels}")
+    # Mostrar ejemplo de secuencia de dedos
+    if len(df) > 0:
+        primera_secuencia = df.iloc[0]['secuencia_dedos_centrales']
+        print(f"   Ejemplo de secuencia (primer registro): {primera_secuencia}")
 
 print("Programa terminado")
 cap.release()
