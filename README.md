@@ -6,11 +6,11 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
 
 ## Características
 
-- **Captura de Datos**: Detecta y registra el estado de los dedos (abierto/cerrado) y la trayectoria del centroide de la mano.
-- **Procesamiento de Video**: Utiliza MediaPipe para detectar landmarks de manos y OpenCV para procesar imágenes.
+- **Captura de datos**: Detecta y registra el estado de los dedos (abierto/cerrado) y la trayectoria del centroide de la mano.
+- **Procesamiento de video**: Utiliza MediaPipe para detectar landmarks de manos y OpenCV para procesar imágenes.
 - **Entrenamiento**: Entrena un modelo K-Nearest Neighbors (KNN) con datos almacenados en un archivo CSV.
-- **Inferencia en Tiempo Real**: Clasifica gestos en tiempo real con confianza calculada.
-- **Interfaz Visual**: Muestra la cámara en vivo, la trayectoria de la mano y el estado del reconocimiento.
+- **Inferencia en tiempo real**: Clasifica gestos en tiempo real con confianza calculada.
+- **Interfaz visual**: Muestra la cámara en vivo, la trayectoria de la mano y el estado del reconocimiento.
 
 ## Requisitos
 
@@ -27,7 +27,7 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
    ```
 3. Asegúrate de tener una cámara web conectada.
 
-## Estructura del Proyecto
+## Estructura del proyecto
 
 - `data.py`: Captura gestos, procesa datos (trayectoria y estado de dedos) y los guarda en un archivo CSV (`dataset_lsm.csv`).
 - `model.py`: Entrena un modelo KNN con los datos del CSV y genera una matriz de confusión para evaluación.
@@ -37,7 +37,7 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
 
 ## Uso
 
-1. **Captura de Datos**:
+1. **Captura de datos**:
 
    - Ejecuta `data.py`:
      ```bash
@@ -49,7 +49,7 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
      - `ESC`: Salir del programa.
    - Realiza gestos frente a la cámara. El sistema detecta automáticamente el inicio y fin de los gestos y los guarda en el CSV.
 
-2. **Entrenamiento del Modelo**:
+2. **Entrenamiento del modelo**:
 
    - Ejecuta `model.py` para entrenar el modelo KNN:
      ```bash
@@ -58,7 +58,7 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
    - El modelo se guarda como `knn_model.pkl`.
    - Se muestra una matriz de confusión y métricas de evaluación si hay suficientes datos.
 
-3. **Inferencia en Tiempo Real**:
+3. **Inferencia en tiempo real**:
    - Ejecuta `inferencia.py`:
      ```bash
      python inferencia.py
@@ -69,15 +69,15 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
      - `ESC`: Salir del programa.
    - El sistema muestra la predicción del gesto y su confianza en tiempo real.
 
-## Flujo de Trabajo
+## Flujo de trabajo
 
 1. **Captura**: Usa `data.py` para grabar gestos y etiquetarlos, generando un dataset en `dataset_lsm.csv`.
 2. **Entrenamiento**: Usa `model.py` para entrenar el modelo KNN con los datos capturados.
 3. **Inferencia**: Usa `inferencia.py` para clasificar gestos en tiempo real con el modelo entrenado.
 
-## Detalles Técnicos
+## Detalles técnicos
 
-- **Detección de Manos**: Utiliza MediaPipe Hands para detectar landmarks de manos con alta precisión (mínimo 0.95 de confianza).
+- **Detección de manos**: Utiliza MediaPipe Hands para detectar landmarks de manos con alta precisión (mínimo 0.95 de confianza).
 - **Características**:
   - Estado de los 5 dedos (0 = cerrado, 1 = abierto) en 5 frames centrales (25 valores).
   - Trayectoria de la mano convertida a un vector binario de 400 píxeles (20x20).
