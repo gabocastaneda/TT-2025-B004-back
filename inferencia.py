@@ -110,7 +110,7 @@ def extraer_centroide_y_dedos(frame, hands):
             return centroide_pos, dedos
     return None, None
 
-def estandarizar_frames(frames, num_frames_deseado=40):
+def estandarizar_frames(frames, num_frames_deseado=30):
     """Estandariza los frames a un número fijo"""
     if len(frames) == 0:
         return []
@@ -127,7 +127,7 @@ def estandarizar_frames(frames, num_frames_deseado=40):
     indices = np.linspace(0, len(frames)-1, num_frames_deseado, dtype=int)
     return [frames[i] for i in indices]
 
-def obtener_frames_medios(frames, num_frames=10):
+def obtener_frames_medios(frames, num_frames=30):  # CAMBIADO: 30 frames en lugar de 10
     """Obtiene los frames del medio de la secuencia"""
     if len(frames) <= num_frames:
         return frames
@@ -192,17 +192,40 @@ def cargar_modelo_knn():
         print(f"Error al cargar el modelo: {e}")
         return None
 
+def ajustar_dimensionalidad(caracteristicas, n_features_esperado):
+    """Ajusta la dimensionalidad de las características al tamaño esperado"""
+    if len(caracteristicas) == n_features_esperado:
+        return caracteristicas.reshape(1, -1)
+    
+    elif len(caracteristicas) < n_features_esperado:
+        # Rellenar con ceros
+        print(f"Rellenando características: {len(caracteristicas)} -> {n_features_esperado}")
+        caracteristicas_ajustadas = np.pad(caracteristicas, 
+                                        (0, n_features_esperado - len(caracteristicas)), 
+                                        'constant', constant_values=0)
+    
+    else:
+        # Recortar
+        print(f"Recortando características: {len(caracteristicas)} -> {n_features_esperado}")
+        caracteristicas_ajustadas = caracteristicas[:n_features_esperado]
+    
+    return caracteristicas_ajustadas.reshape(1, -1)
+
 def predecir_gesto(secuencia_dedos_centrales, vector_binario, modelo):
     """Predice la clase del gesto usando el modelo KNN"""
     # Preparar características en el mismo formato que durante el entrenamiento
     vector_dedos = np.array(secuencia_dedos_centrales).flatten()
     vector_trayectoria = (vector_binario / 255.0).astype(np.float64)
     
-    caracteristicas = np.concatenate([vector_dedos, vector_trayectoria]).reshape(1, -1)
+    # Concatenar características
+    caracteristicas = np.concatenate([vector_dedos, vector_trayectoria])
+    
+    # Ajustar al tamaño esperado por el modelo
+    caracteristicas_ajustadas = ajustar_dimensionalidad(caracteristicas, modelo.n_features_in_)
     
     # Predecir
-    prediccion = modelo.predict(caracteristicas)[0]
-    probabilidades = modelo.predict_proba(caracteristicas)[0]
+    prediccion = modelo.predict(caracteristicas_ajustadas)[0]
+    probabilidades = modelo.predict_proba(caracteristicas_ajustadas)[0]
     
     # Obtener confianza
     clase_idx = list(modelo.classes_).index(prediccion)
@@ -285,13 +308,13 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                     if len(centroides_buffer) >= 5:  # Mínimo 5 frames para una seña válida
                         print("Procesando datos para inferencia...")
                         
-                        # Estandarizar a 40 frames (rellenar si es necesario)
-                        centroides_estandarizados = estandarizar_frames(centroides_buffer, 40)
-                        estados_dedos_estandarizados = estandarizar_frames(estados_dedos_buffer, 40)
+                        # Estandarizar a 30 frames (igual que en data.py)
+                        centroides_estandarizados = estandarizar_frames(centroides_buffer, 30)
+                        estados_dedos_estandarizados = estandarizar_frames(estados_dedos_buffer, 30)
                         
-                        # Obtener 10 frames medios
-                        centroides_medios = obtener_frames_medios(centroides_estandarizados, 10)
-                        estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 10)
+                        # Obtener 30 frames medios (igual que en data.py)
+                        centroides_medios = obtener_frames_medios(centroides_estandarizados, 30)
+                        estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 30)
                         
                         # Crear pizarrón
                         pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Inferencia')
@@ -311,9 +334,6 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         # Guardar para mostrar en ventanas
                         vector_actual = vector_binario
                         matriz_actual = matriz_binaria
-                        
-                        # Mostrar imagen binaria
-                        # cv2.imshow('Imagen Binaria', matriz_binaria)
                         
                         ultima_prediccion = time.time()
                     else:
@@ -373,7 +393,6 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             cv2.putText(frame, info_vector, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         
         # Mostrar ventanas
-        # cv2.imshow('Trayectoria Inferencia', pizarra_actual)
         cv2.imshow('Camara LSM - Inferencia', frame)
         
         # Manejo de teclas
@@ -394,10 +413,10 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                 grabando_inferencia = False
                 print("Predicción forzada por usuario")
                 # Procesar datos actuales (código duplicado por simplicidad)
-                centroides_estandarizados = estandarizar_frames(centroides_buffer, 40)
-                estados_dedos_estandarizados = estandarizar_frames(estados_dedos_buffer, 40)
-                centroides_medios = obtener_frames_medios(centroides_estandarizados, 10)
-                estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 10)
+                centroides_estandarizados = estandarizar_frames(centroides_buffer, 30)
+                estados_dedos_estandarizados = estandarizar_frames(estados_dedos_buffer, 30)
+                centroides_medios = obtener_frames_medios(centroides_estandarizados, 30)
+                estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 30)
                 pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Inferencia')
                 vector_binario, matriz_binaria = pizarron_a_vector_binario(pizarra_actual)
                 secuencia_dedos_array = np.array(estados_dedos_medios)
@@ -407,8 +426,6 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                 print(f"Predicción forzada: '{prediccion}' (confianza: {confianza:.2f})")
                 vector_actual = vector_binario
                 matriz_actual = matriz_binaria
-                # cv2.imshow('Imagen Binaria', matriz_binaria)
-        
         # Actualizar estado anterior
         mano_detectada_anteriormente = mano_actualmente_detectada
 

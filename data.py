@@ -103,7 +103,7 @@ def extraer_centroide_y_dedos(frame, hands):
             return centroide_pos, dedos
     return None, None
 
-def estandarizar_frames(frames, num_frames_deseado=20):
+def estandarizar_frames(frames, num_frames_deseado=30):
     """Estandariza los frames a un número fijo"""
     if len(frames) == 0:
         return []
