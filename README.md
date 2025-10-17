@@ -1,70 +1,101 @@
-# Sistema de Captura y Registro de Gestos Manuales
-
-Este proyecto permite capturar gestos de manos en tiempo real, extraer su trayectoria y el estado de los dedos, y almacenar estos datos estructurados en un archivo CSV, utilizando MediaPipe y OpenCV en Python.
+# Lenguaje de Señas Mexicanas (LSM) - Sistema de Reconocimiento
 
 ## Descripción
 
-El sistema detecta una mano desde la cámara, extrae la posición del centroide y el estado de los cinco dedos (abierto/cerrado), genera una representación binaria de la trayectoria y registra toda la información junto con la clase del gesto en un CSV. Está diseñado para construir datasets de gestos, útiles para entrenamiento de modelos de clasificación de lenguaje de señas o reconocimiento de gestos.
+Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de Señas Mexicanas (LSM) utilizando visión por computadora y aprendizaje automático. El sistema captura gestos de manos a través de una cámara web, procesa la información de trayectoria y estado de los dedos, y utiliza un modelo KNN para clasificar los gestos en tiempo real.
 
 ## Características
 
-- Seguimiento en tiempo real de landmarks con MediaPipe.
-- Extracción de trayectoria del centroide y estado de los dedos en cada frame.
-- Visualización de trayectorias y estados en la interfaz.
-- Estandarización de los datos y almacenamiento en vectores binarios.
-- Compatible con entrenamiento de modelos de machine learning (KNN).
-- Compatible con inferencia en tiempo real desde cámara.
+- **Captura de Datos**: Detecta y registra el estado de los dedos (abierto/cerrado) y la trayectoria del centroide de la mano.
+- **Procesamiento de Video**: Utiliza MediaPipe para detectar landmarks de manos y OpenCV para procesar imágenes.
+- **Entrenamiento**: Entrena un modelo K-Nearest Neighbors (KNN) con datos almacenados en un archivo CSV.
+- **Inferencia en Tiempo Real**: Clasifica gestos en tiempo real con confianza calculada.
+- **Interfaz Visual**: Muestra la cámara en vivo, la trayectoria de la mano y el estado del reconocimiento.
 
-## Entrenamiento del Modelo
+## Requisitos
 
-El entrenamiento se realiza mediante **K-Nearest Neighbors (KNN)** utilizando los datos registrados previamente.  
-El script `model.py` se encarga de leer el archivo CSV, procesar los vectores de características (estado de los dedos y trayectoria binaria), entrenar el modelo y guardar el resultado.
+- Python 3.10.11
+- Cámara web funcional
+- Sistema operativo: Windows, macOS o Linux
 
-**Pasos:**
+## Instalación
 
-1. Asegúrate de tener un archivo `dataset_lsm.csv` generado con capturas previas.
-2. Ejecuta el script de entrenamiento:
+1. Clona o descarga el repositorio.
+2. Instala las dependencias:
    ```bash
-   python model.py
+   pip install -r requirements.txt
    ```
-3. Durante la ejecución:
-   - Se cargan los datos desde CSV.
-   - Se separan características (X) y etiquetas (y).
-   - Se divide el dataset en entrenamiento y prueba (80/20) si hay suficientes muestras.
-   - Se entrena un modelo KNN con los vecinos definidos (por defecto 11).
-   - Se genera un reporte de precisión, matriz de confusión y se guarda el modelo en `knn_model.pkl`.
+3. Asegúrate de tener una cámara web conectada.
 
-**Salida esperada:**
+## Estructura del Proyecto
 
-- Reporte de clasificación con métricas de rendimiento.
-- Visualización de matriz de confusión.
-- Archivo `knn_model.pkl` con el modelo entrenado listo para usar en inferencia.
+- `data.py`: Captura gestos, procesa datos (trayectoria y estado de dedos) y los guarda en un archivo CSV (`dataset_lsm.csv`).
+- `model.py`: Entrena un modelo KNN con los datos del CSV y genera una matriz de confusión para evaluación.
+- `inferencia.py`: Realiza predicciones en tiempo real utilizando el modelo entrenado.
+- `dataset_lsm.csv`: Almacena los datos capturados (clase, secuencia de dedos y vector binario de trayectoria).
+- `knn_model.pkl`: Archivo donde se guarda el modelo KNN entrenado.
 
-## Inferencia en Tiempo Real
+## Uso
 
-El script `inferencia.py` implementa un sistema de predicción en tiempo real utilizando el modelo entrenado (`knn_model.pkl`). Captura los gestos desde la cámara y predice su clase automáticamente.
+1. **Captura de Datos**:
 
-**Flujo principal:**
+   - Ejecuta `data.py`:
+     ```bash
+     python data.py
+     ```
+   - Controles:
+     - `C`: Cambiar la clase actual (etiqueta del gesto).
+     - `G`: Guardar el gesto actual en el CSV (manualmente).
+     - `ESC`: Salir del programa.
+   - Realiza gestos frente a la cámara. El sistema detecta automáticamente el inicio y fin de los gestos y los guarda en el CSV.
 
-1. Se carga el modelo KNN preentrenado.
-2. Se inicia la cámara (MediaPipe Hands).
-3. Cuando una mano es detectada:
-   - Se extraen los landmarks.
-   - Se calculan el centroide y el estado de los dedos.
-   - Se estandarizan los frames a 30 muestras.
-   - Se genera una imagen binaria de trayectoria.
-   - Se combinan todas las características y se realiza la predicción con KNN.
+2. **Entrenamiento del Modelo**:
 
-**Controles de teclado:**
+   - Ejecuta `model.py` para entrenar el modelo KNN:
+     ```bash
+     python model.py
+     ```
+   - El modelo se guarda como `knn_model.pkl`.
+   - Se muestra una matriz de confusión y métricas de evaluación si hay suficientes datos.
 
-- **R:** Reiniciar la inferencia.
-- **Espacio:** Forzar una predicción manual.
-- **Esc:** Salir del programa.
+3. **Inferencia en Tiempo Real**:
+   - Ejecuta `inferencia.py`:
+     ```bash
+     python inferencia.py
+     ```
+   - Controles:
+     - `R`: Reiniciar la captura para una nueva predicción.
+     - `ESPACIO`: Forzar una predicción con los datos actuales.
+     - `ESC`: Salir del programa.
+   - El sistema muestra la predicción del gesto y su confianza en tiempo real.
 
-**Salida en consola y ventana:**
+## Flujo de Trabajo
 
-- Predicción del gesto y nivel de confianza.
-- Visualización de trayectoria, estados de dedos y resultados en pantalla.
+1. **Captura**: Usa `data.py` para grabar gestos y etiquetarlos, generando un dataset en `dataset_lsm.csv`.
+2. **Entrenamiento**: Usa `model.py` para entrenar el modelo KNN con los datos capturados.
+3. **Inferencia**: Usa `inferencia.py` para clasificar gestos en tiempo real con el modelo entrenado.
 
-El sistema espera al menos 5 frames válidos antes de realizar una predicción.  
-Si la confianza es baja (<0.7), el color cambia para indicar incertidumbre.
+## Detalles Técnicos
+
+- **Detección de Manos**: Utiliza MediaPipe Hands para detectar landmarks de manos con alta precisión (mínimo 0.95 de confianza).
+- **Características**:
+  - Estado de los 5 dedos (0 = cerrado, 1 = abierto) en 5 frames centrales (25 valores).
+  - Trayectoria de la mano convertida a un vector binario de 400 píxeles (20x20).
+- **Modelo**: KNN con 11 vecinos (configurable en `model.py`).
+- **Estandarización**: Los datos se estandarizan a 30 frames, y se seleccionan los 30 frames centrales para la inferencia.
+- **Visualización**: Muestra la trayectoria de la mano en un pizarrón de 200x200 píxeles y el estado de los dedos en tiempo real.
+
+## Limitaciones
+
+- Requiere buena iluminación y fondo limpio para una detección óptima.
+- Solo detecta una mano a la vez (`max_num_hands=1`), hasta el momento.
+- La precisión depende de la cantidad y calidad de los datos en `dataset_lsm.csv`.
+- El modelo KNN puede no ser óptimo para datasets muy grandes o gestos complejos.
+
+## Contribuciones
+
+Las contribuciones son bienvenidas. Por favor, crea un _issue_ o _pull request_ en el repositorio para sugerencias o mejoras.
+
+## Licencia
+
+Este proyecto está bajo la licencia MIT. Consulta el archivo `LICENSE` para más detalles.
