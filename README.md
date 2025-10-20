@@ -95,7 +95,3 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
 ## Contribuciones
 
 Las contribuciones son bienvenidas. Por favor, crea un _issue_ o _pull request_ en el repositorio para sugerencias o mejoras.
-
-## Licencia
-
-Este proyecto está bajo la licencia MIT. Consulta el archivo `LICENSE` para más detalles.
