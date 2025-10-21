@@ -313,8 +313,8 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         estados_dedos_estandarizados = estandarizar_frames(estados_dedos_buffer, 30)
                         
                         # Obtener 30 frames medios (igual que en data.py)
-                        centroides_medios = obtener_frames_medios(centroides_estandarizados, 30)
-                        estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 30)
+                        centroides_medios = obtener_frames_medios(centroides_estandarizados, 10)
+                        estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 10)
                         
                         # Crear pizarrón
                         pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Inferencia')

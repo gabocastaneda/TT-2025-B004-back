@@ -306,8 +306,8 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                         estados_dedos_30 = estandarizar_frames(estados_dedos_trayectoria, 30)
                         
                         # Obtener frames medios para ambos (mismo segmento temporal)
-                        centroides_medios = obtener_frames_medios(centroides_30, 30)
-                        estados_dedos_medios = obtener_frames_medios(estados_dedos_30, 30)
+                        centroides_medios = obtener_frames_medios(centroides_30, 10)
+                        estados_dedos_medios = obtener_frames_medios(estados_dedos_30, 10)
                         
                         # Convertir a array numpy
                         secuencia_dedos_array = np.array(estados_dedos_medios)
