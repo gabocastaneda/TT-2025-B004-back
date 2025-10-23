@@ -18,16 +18,15 @@ bases = [6, 10, 14, 18]
 puntas = [8, 12, 16, 20]
 
 # Variables globales para inferencia
-frames_inferencia = []
-mano_detectada_anteriormente = False
-estado_dedos_actual = []
 modelo_knn = "knn_model.pkl"
 prediccion_actual = ""
 confianza_actual = 0.0
 
 # Buffers para inferencia en tiempo real
-centroides_buffer = []
-estados_dedos_buffer = []
+trayectoria_izq_buffer = []
+trayectoria_der_buffer = []
+estados_dedos_izq_buffer = []
+estados_dedos_der_buffer = []
 grabando_inferencia = False
 inicio_grabacion = 0
 
@@ -100,40 +99,20 @@ def detectar_dedos(hand_landmarks, width, height):
     return dedos, (nx, ny)
 
 def extraer_centroide_y_dedos(frame, hands):
-    """Extrae centroide y estado de dedos de un frame"""
+    """Extrae centroides y estados de dedos de ambas manos"""
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(frame_rgb)
+    
+    centroides = []
+    dedos_manos = []
     
     if results.multi_hand_landmarks:
         for hand_landmarks in results.multi_hand_landmarks:
             dedos, centroide_pos = detectar_dedos(hand_landmarks, frame.shape[1], frame.shape[0])
-            return centroide_pos, dedos
-    return None, None
-
-def estandarizar_frames(frames, num_frames_deseado=30):
-    """Estandariza los frames a un número fijo"""
-    if len(frames) == 0:
-        return []
+            centroides.append(centroide_pos)
+            dedos_manos.append(dedos)
     
-    if len(frames) == num_frames_deseado:
-        return frames
-    
-    if len(frames) < num_frames_deseado:
-        frames_estandarizados = frames.copy()
-        while len(frames_estandarizados) < num_frames_deseado:
-            frames_estandarizados.append(frames[-1])
-        return frames_estandarizados
-    
-    indices = np.linspace(0, len(frames)-1, num_frames_deseado, dtype=int)
-    return [frames[i] for i in indices]
-
-def obtener_frames_medios(frames, num_frames=30):  # CAMBIADO: 30 frames en lugar de 10
-    """Obtiene los frames del medio de la secuencia"""
-    if len(frames) <= num_frames:
-        return frames
-    
-    inicio = (len(frames) - num_frames) // 2
-    return frames[inicio:inicio + num_frames]
+    return centroides, dedos_manos
 
 def crear_pizarron(trayectoria, nombre):
     if trayectoria:
@@ -179,7 +158,7 @@ def cargar_modelo_knn():
     """Carga el modelo KNN entrenado"""
     if not os.path.exists(modelo_knn):
         print(f"No se encuentra el modelo: {modelo_knn}")
-        print("Ejecuta primero: python entrenamiento.py")
+        print("Ejecuta primero el entrenamiento")
         return None
     
     try:
@@ -211,14 +190,19 @@ def ajustar_dimensionalidad(caracteristicas, n_features_esperado):
     
     return caracteristicas_ajustadas.reshape(1, -1)
 
-def predecir_gesto(secuencia_dedos_centrales, vector_binario, modelo):
+def predecir_gesto(dedos_izq, dedos_der, vector_izq, vector_der, modelo):
     """Predice la clase del gesto usando el modelo KNN"""
-    # Preparar características en el mismo formato que durante el entrenamiento
-    vector_dedos = np.array(secuencia_dedos_centrales).flatten()
-    vector_trayectoria = (vector_binario / 255.0).astype(np.float64)
+    # Convertir a formato binario (0 y 1) - igual que en data.py
+    vector_izq_bin = (vector_izq / 255.0).astype(np.float64)
+    vector_der_bin = (vector_der / 255.0).astype(np.float64)
     
-    # Concatenar características
-    caracteristicas = np.concatenate([vector_dedos, vector_trayectoria])
+    # Concatenar características en el mismo orden que durante el entrenamiento
+    caracteristicas = np.concatenate([
+        dedos_izq,           # 5 características
+        dedos_der,           # 5 características  
+        vector_izq_bin,      # 400 características
+        vector_der_bin       # 400 características
+    ])
     
     # Ajustar al tamaño esperado por el modelo
     caracteristicas_ajustadas = ajustar_dimensionalidad(caracteristicas, modelo.n_features_in_)
@@ -250,15 +234,15 @@ print("=" * 50)
 
 cap = cv2.VideoCapture(0)
 
-with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidence=0.95) as hands:
+with mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidence=0.7, min_tracking_confidence=0.5) as hands:
     ultima_deteccion = time.time()
-    pizarra_actual = crear_pizarron([], 'Esperando')
-    vector_actual = None
-    matriz_actual = None
+    pizarra_izq_actual = crear_pizarron([], 'Esperando Izq')
+    pizarra_der_actual = crear_pizarron([], 'Esperando Der')
     
     # Variables para control de inferencia
     ultima_prediccion = time.time()
     frames_capturados = 0
+    estado_dedos_actual = None
     
     while True:
         ret, frame = cap.read()
@@ -272,12 +256,14 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
         mano_actualmente_detectada = results.multi_hand_landmarks is not None
         
         # Lógica de detección de inicio/fin de seña
-        if not grabando_inferencia and mano_actualmente_detectada and not mano_detectada_anteriormente:
+        if not grabando_inferencia and mano_actualmente_detectada:
             # Inicio de seña detectado
             grabando_inferencia = True
             inicio_grabacion = time.time()
-            centroides_buffer = []
-            estados_dedos_buffer = []
+            trayectoria_izq_buffer = []
+            trayectoria_der_buffer = []
+            estados_dedos_izq_buffer = []
+            estados_dedos_der_buffer = []
             frames_capturados = 0
             print("Inicio de seña detectado - Capturando...")
         
@@ -286,60 +272,69 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
                 ultima_deteccion = time.time()
                 frames_capturados += 1
                 
-                # Extraer centroide y dedos del frame actual
-                centroide_pos, dedos = extraer_centroide_y_dedos(frame, hands)
-                if centroide_pos is not None and dedos is not None:
-                    centroides_buffer.append(centroide_pos)
-                    estados_dedos_buffer.append(dedos)
-                    estado_dedos_actual = dedos
+                # Extraer centroides y dedos del frame actual
+                centroides, dedos_manos = extraer_centroide_y_dedos(frame, hands)
                 
-                # Verificar si la seña ha terminado (sin mano por 0.5 segundos)
-                estado_texto = f"GRABANDO MANO: {frames_capturados} frames"
+                # Procesar según número de manos detectadas
+                if len(dedos_manos) == 1:
+                    # Una mano - asumir derecha por defecto
+                    dedos_der = dedos_manos[0]
+                    dedos_izq = np.zeros(5, dtype=int)
+                    trayectoria_der.append(centroides[0])
+                    estados_dedos_der_buffer.append(dedos_der)
+                    estado_dedos_actual = dedos_der
+                elif len(dedos_manos) >= 2:
+                    # Dos manos - tomar las primeras dos
+                    dedos_izq, dedos_der = dedos_manos[0], dedos_manos[1]
+                    trayectoria_izq_buffer.append(centroides[0])
+                    trayectoria_der_buffer.append(centroides[1])
+                    estados_dedos_izq_buffer.append(dedos_izq)
+                    estados_dedos_der_buffer.append(dedos_der)
+                    estado_dedos_actual = dedos_der  # Mostrar mano derecha por defecto
+                
+                estado_texto = f"GRABANDO: {frames_capturados} frames"
                 color_estado = (0, 255, 0)
                 
             else:
-                # Si no hay mano detectada por 0.5 segundos, considerar que la seña terminó
-                if time.time() - ultima_deteccion > 0.5:
+                # Si no hay mano detectada por 1 segundo, considerar que la seña terminó
+                if time.time() - ultima_deteccion > 1.0:
                     grabando_inferencia = False
                     duracion_seña = time.time() - inicio_grabacion
                     print(f"Seña completada: {frames_capturados} frames ({duracion_seña:.1f}s)")
                     
                     # Realizar predicción con los datos capturados
-                    if len(centroides_buffer) >= 5:  # Mínimo 5 frames para una seña válida
+                    if frames_capturados >= 5:  # Mínimo 5 frames para una seña válida
                         print("Procesando datos para inferencia...")
                         
-                        # Estandarizar a 30 frames (igual que en data.py)
-                        centroides_estandarizados = estandarizar_frames(centroides_buffer, 30)
-                        estados_dedos_estandarizados = estandarizar_frames(estados_dedos_buffer, 30)
+                        # Obtener últimos estados de dedos
+                        dedos_izq_final = estados_dedos_izq_buffer[-1] if estados_dedos_izq_buffer else np.zeros(5, dtype=int)
+                        dedos_der_final = estados_dedos_der_buffer[-1] if estados_dedos_der_buffer else np.zeros(5, dtype=int)
                         
-                        # Obtener 30 frames medios (igual que en data.py)
-                        centroides_medios = obtener_frames_medios(centroides_estandarizados, 10)
-                        estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 10)
+                        # Crear pizarrones
+                        pizarra_izq = crear_pizarron(trayectoria_izq_buffer, 'Mano Izquierda')
+                        pizarra_der = crear_pizarron(trayectoria_der_buffer, 'Mano Derecha')
                         
-                        # Crear pizarrón
-                        pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Inferencia')
-                        
-                        # Convertir a vector binario
-                        vector_binario, matriz_binaria = pizarron_a_vector_binario(pizarra_actual)
+                        # Convertir a vectores binarios
+                        vector_izq, matriz_izq = pizarron_a_vector_binario(pizarra_izq)
+                        vector_der, matriz_der = pizarron_a_vector_binario(pizarra_der)
                         
                         # Predecir gesto
-                        secuencia_dedos_array = np.array(estados_dedos_medios)
-                        prediccion, confianza = predecir_gesto(secuencia_dedos_array, vector_binario, modelo)
+                        prediccion, confianza = predecir_gesto(dedos_izq_final, dedos_der_final, vector_izq, vector_der, modelo)
                         
                         prediccion_actual = prediccion
                         confianza_actual = confianza
                         
-                        print(f"Predicción: '{prediccion}' (confianza: {confianza:.2f})")
+                        # Actualizar para mostrar
+                        pizarra_izq_actual = pizarra_izq
+                        pizarra_der_actual = pizarra_der
                         
-                        # Guardar para mostrar en ventanas
-                        vector_actual = vector_binario
-                        matriz_actual = matriz_binaria
+                        print(f"Predicción: '{prediccion}' (confianza: {confianza:.2f})")
                         
                         ultima_prediccion = time.time()
                     else:
                         print("Seña demasiado corta para procesar (mínimo 5 frames)")
                     
-                    estado_texto = f"PROCESANDO: {frames_capturados} frames"
+                    estado_texto = f"PROCESADO"
                     color_estado = (255, 0, 0)
                 else:
                     estado_texto = f"GRABANDO: {frames_capturados} frames (sin mano)"
@@ -347,7 +342,7 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
         
         else:
             if mano_actualmente_detectada:
-                estado_texto = "LISTO - Esperando mano"
+                estado_texto = "LISTO - Moviendo mano..."
                 color_estado = (0, 255, 255)
             else:
                 estado_texto = "ESPERANDO MANO..."
@@ -373,11 +368,7 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
         
         # Mostrar información en pantalla
         cv2.putText(frame, estado_texto, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_estado, 2)
-        
-        if grabando_inferencia:
-            cv2.putText(frame, f"Frames: {frames_capturados}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        else:
-            cv2.putText(frame, f"Ultima prediccion: {frames_capturados} frames", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(frame, f"Frames: {frames_capturados}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         
         if estado_dedos_actual is not None:
             dedos_texto = f"Dedos: {''.join([str(d) for d in estado_dedos_actual])}"
@@ -388,11 +379,9 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
             texto_prediccion = f"Gesto: {prediccion_actual} ({confianza_actual:.2f})"
             cv2.putText(frame, texto_prediccion, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_prediccion, 2)
         
-        if vector_actual is not None:
-            info_vector = f"Vector: {len(vector_actual)} pixels"
-            cv2.putText(frame, info_vector, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
-        
         # Mostrar ventanas
+        cv2.imshow('Trayectoria Izquierda', pizarra_izq_actual)
+        cv2.imshow('Trayectoria Derecha', pizarra_der_actual)
         cv2.imshow('Camara LSM - Inferencia', frame)
         
         # Manejo de teclas
@@ -402,36 +391,47 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=1, min_detection_confidenc
         elif key == ord('r') or key == ord('R'):
             # Reiniciar inferencia
             grabando_inferencia = False
-            centroides_buffer = []
-            estados_dedos_buffer = []
+            trayectoria_izq_buffer = []
+            trayectoria_der_buffer = []
+            estados_dedos_izq_buffer = []
+            estados_dedos_der_buffer = []
             prediccion_actual = ""
             estado_dedos_actual = None
             frames_capturados = 0
+            pizarra_izq_actual = crear_pizarron([], 'Reiniciado Izq')
+            pizarra_der_actual = crear_pizarron([], 'Reiniciado Der')
             print("Inferencia reiniciada - Esperando nueva seña")
         elif key == 32:  # ESPACIO - Forzar predicción
-            if grabando_inferencia and len(centroides_buffer) >= 5:
+            if grabando_inferencia and frames_capturados >= 5:
                 grabando_inferencia = False
                 print("Predicción forzada por usuario")
-                # Procesar datos actuales (código duplicado por simplicidad)
-                centroides_estandarizados = estandarizar_frames(centroides_buffer, 30)
-                estados_dedos_estandarizados = estandarizar_frames(estados_dedos_buffer, 30)
-                centroides_medios = obtener_frames_medios(centroides_estandarizados, 30)
-                estados_dedos_medios = obtener_frames_medios(estados_dedos_estandarizados, 30)
-                pizarra_actual = crear_pizarron(centroides_medios, 'Trayectoria Inferencia')
-                vector_binario, matriz_binaria = pizarron_a_vector_binario(pizarra_actual)
-                secuencia_dedos_array = np.array(estados_dedos_medios)
-                prediccion, confianza = predecir_gesto(secuencia_dedos_array, vector_binario, modelo)
+                
+                # Obtener últimos estados de dedos
+                dedos_izq_final = estados_dedos_izq_buffer[-1] if estados_dedos_izq_buffer else np.zeros(5, dtype=int)
+                dedos_der_final = estados_dedos_der_buffer[-1] if estados_dedos_der_buffer else np.zeros(5, dtype=int)
+                
+                # Crear pizarrones
+                pizarra_izq = crear_pizarron(trayectoria_izq_buffer, 'Mano Izquierda')
+                pizarra_der = crear_pizarron(trayectoria_der_buffer, 'Mano Derecha')
+                
+                # Convertir a vectores binarios
+                vector_izq, matriz_izq = pizarron_a_vector_binario(pizarra_izq)
+                vector_der, matriz_der = pizarron_a_vector_binario(pizarra_der)
+                
+                # Predecir gesto
+                prediccion, confianza = predecir_gesto(dedos_izq_final, dedos_der_final, vector_izq, vector_der, modelo)
+                
                 prediccion_actual = prediccion
                 confianza_actual = confianza
+                
+                # Actualizar para mostrar
+                pizarra_izq_actual = pizarra_izq
+                pizarra_der_actual = pizarra_der
+                
                 print(f"Predicción forzada: '{prediccion}' (confianza: {confianza:.2f})")
-                vector_actual = vector_binario
-                matriz_actual = matriz_binaria
-        # Actualizar estado anterior
-        mano_detectada_anteriormente = mano_actualmente_detectada
 
 # Estadísticas finales
 print(f"\nESTADÍSTICAS DE INFERENCIA:")
-print(f"   Frames procesados: {len(frames_inferencia)}")
 print(f"   Última predicción: '{prediccion_actual}' (confianza: {confianza_actual:.2f})")
 
 print("Programa terminado")

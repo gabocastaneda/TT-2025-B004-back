@@ -49,7 +49,7 @@ def entrenar_modelo_knn(archivo_csv="dataset_lsm.csv", modelo_salida="knn_model.
     
     # Dividir datos para evaluación
     if len(df) > 10:
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0, stratify=y, shuffle=True) 
         
         # Entrenar modelo KNN
         knn = KNeighborsClassifier(n_neighbors=n_vecinos)
