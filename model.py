@@ -81,6 +81,7 @@ def entrenar_modelo_knn(archivo_csv="dataset_lsm.csv", modelo_salida="knn_model.
         plt.ylabel("Real")
         plt.tight_layout()
         plt.show()
+        plt.savefig()
         
     else:
         # Entrenar con todos los datos si hay pocas muestras
