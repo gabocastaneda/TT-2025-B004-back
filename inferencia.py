@@ -280,14 +280,14 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidenc
                     # Una mano - asumir derecha por defecto
                     dedos_der = dedos_manos[0]
                     dedos_izq = np.zeros(5, dtype=int)
-                    trayectoria_der.append(centroides[0])
+                    trayectoria_der_buffer.append(centroides[0])  # CORREGIDO: trayectoria_der_buffer
                     estados_dedos_der_buffer.append(dedos_der)
                     estado_dedos_actual = dedos_der
                 elif len(dedos_manos) >= 2:
                     # Dos manos - tomar las primeras dos
                     dedos_izq, dedos_der = dedos_manos[0], dedos_manos[1]
                     trayectoria_izq_buffer.append(centroides[0])
-                    trayectoria_der_buffer.append(centroides[1])
+                    trayectoria_der_buffer.append(centroides[1])  # CORREGIDO: trayectoria_der_buffer
                     estados_dedos_izq_buffer.append(dedos_izq)
                     estados_dedos_der_buffer.append(dedos_der)
                     estado_dedos_actual = dedos_der  # Mostrar mano derecha por defecto
@@ -312,7 +312,7 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidenc
                         
                         # Crear pizarrones
                         pizarra_izq = crear_pizarron(trayectoria_izq_buffer, 'Mano Izquierda')
-                        pizarra_der = crear_pizarron(trayectoria_der_buffer, 'Mano Derecha')
+                        pizarra_der = crear_pizarron(trayectoria_der_buffer, 'Mano Derecha')  # CORREGIDO: trayectoria_der_buffer
                         
                         # Convertir a vectores binarios
                         vector_izq, matriz_izq = pizarron_a_vector_binario(pizarra_izq)
@@ -412,7 +412,7 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidenc
                 
                 # Crear pizarrones
                 pizarra_izq = crear_pizarron(trayectoria_izq_buffer, 'Mano Izquierda')
-                pizarra_der = crear_pizarron(trayectoria_der_buffer, 'Mano Derecha')
+                pizarra_der = crear_pizarron(trayectoria_der_buffer, 'Mano Derecha')  # CORREGIDO: trayectoria_der_buffer
                 
                 # Convertir a vectores binarios
                 vector_izq, matriz_izq = pizarron_a_vector_binario(pizarra_izq)
