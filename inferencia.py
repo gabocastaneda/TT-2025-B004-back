@@ -13,6 +13,9 @@ puntos_palma = [0, 1, 2, 5, 9, 13, 17]
 bases = [6, 10, 14, 18]
 puntas = [8, 12, 16, 20]
 
+# Configuración del umbral de confianza
+UMBRAL_CONFIANZA = 0.70  # 70% de confianza mínima
+
 def centroide(lista_coordenadas):
     """Calcula el centroide de una lista de coordenadas"""
     coordenadas = np.array(lista_coordenadas)
@@ -207,10 +210,24 @@ def cargar_modelo(nombre_archivo="knn_gestos_model.pkl"):
         modelo_cargado = joblib.load(nombre_archivo)
         print(f"Modelo cargado: {nombre_archivo}")
         print(f"Clases disponibles: {list(modelo_cargado['classes'])}")
+        print(f"Umbral de confianza: {UMBRAL_CONFIANZA*100}%")
         return modelo_cargado
     except Exception as e:
         print(f"Error cargando modelo: {e}")
         return None
+
+def determinar_prediccion_final(prediccion_encoded, confianza, label_encoder):
+    """Determina la predicción final aplicando el umbral de confianza"""
+    if confianza >= UMBRAL_CONFIANZA:
+        prediccion = label_encoder.inverse_transform([prediccion_encoded])[0]
+        estado = "RECONOCIDO"
+        color_prediccion = (0, 255, 0)  # Verde
+    else:
+        prediccion = "No reconocido"
+        estado = "BAJA_CONFIANZA"
+        color_prediccion = (0, 165, 255)  # Naranja
+    
+    return prediccion, estado, color_prediccion
 
 def main():
     """Función principal de inferencia en tiempo real"""
@@ -243,8 +260,11 @@ def main():
     # Variables para resultado
     prediccion_actual = "Esperando..."
     confianza_actual = 0.0
-    
+    estado_prediccion = "INICIAL"
+    color_prediccion = (255, 255, 255)  # Blanco por defecto
+
     print("\nSISTEMA DE INFERENCIA EN TIEMPO REAL")
+    print(f"   Umbral de confianza: {UMBRAL_CONFIANZA*100}%")
     print("   La grabación comenzará automáticamente cuando detecte una mano")
     print("   Presione ESC para salir")
 
@@ -271,6 +291,8 @@ def main():
                 estados_dedos_trayectoria_right = []
                 ultima_deteccion = time.time()
                 prediccion_actual = "Grabando..."
+                estado_prediccion = "GRABANDO"
+                color_prediccion = (0, 255, 255)  # Amarillo
                 print("¡Mano detectada! Comenzando grabación...")
 
             # Durante la grabación
@@ -343,18 +365,29 @@ def main():
                                 probabilidades = model.predict_proba(X_inferencia)[0]
                                 confianza = np.max(probabilidades)
                                 
-                                # Decodificar predicción
-                                prediccion = label_encoder.inverse_transform([prediccion_encoded])[0]
+                                # Aplicar umbral de confianza
+                                prediccion, estado, color_pred = determinar_prediccion_final(
+                                    prediccion_encoded, confianza, label_encoder
+                                )
                                 
-                                prediccion_actual = f"Pred: {prediccion}"
+                                prediccion_actual = prediccion
                                 confianza_actual = confianza
+                                estado_prediccion = estado
+                                color_prediccion = color_pred
                                 
-                                print(f"Predicción: {prediccion} (Confianza: {confianza:.2f})")
+                                print(f"Predicción: {prediccion} (Confianza: {confianza:.2f}) - {estado}")
                                 
                             except Exception as e:
                                 print(f"Error en predicción: {e}")
                                 prediccion_actual = "Error en predicción"
                                 confianza_actual = 0.0
+                                estado_prediccion = "ERROR"
+                                color_prediccion = (0, 0, 255)  # Rojo
+                        else:
+                            prediccion_actual = "Sin datos"
+                            confianza_actual = 0.0
+                            estado_prediccion = "SIN_DATOS"
+                            color_prediccion = (128, 128, 128)  # Gris
 
                         estado_texto = "PROCESADO"
                         color_estado = (255, 0, 0)
@@ -383,8 +416,18 @@ def main():
             # Mostrar información en pantalla
             cv2.putText(frame, estado_texto, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_estado, 2)
             cv2.putText(frame, f"Frames: {len(frames_video)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-            cv2.putText(frame, f"Prediccion: {prediccion_actual}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(frame, f"Confianza: {confianza_actual:.2f}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            
+            # Mostrar predicción con color según el estado
+            cv2.putText(frame, f"Prediccion: {prediccion_actual}", (10, 90), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_prediccion, 2)
+            cv2.putText(frame, f"Confianza: {confianza_actual:.2f}", (10, 120), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            cv2.putText(frame, f"Estado: {estado_prediccion}", (10, 150), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_prediccion, 2)
+            
+            # Mostrar umbral actual
+            cv2.putText(frame, f"Umbral: {UMBRAL_CONFIANZA*100}%", (width - 150, 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
             cv2.imshow('Inferencia en Tiempo Real - Detección de Gestos', frame)
 

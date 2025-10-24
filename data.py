@@ -135,11 +135,11 @@ def extraer_centroide_y_dedos(results, width, height):
 
         # Recompute dedos using position-based label
         dedos_left, centroide_left = detectar_dedos_mejorado(results.multi_hand_landmarks[left_idx], width, height,
-                                                             'Left')
+                                                            'Left')
         data['Left'] = (centroide_left, dedos_left)
 
         dedos_right, centroide_right = detectar_dedos_mejorado(results.multi_hand_landmarks[right_idx], width, height,
-                                                               'Right')
+                                                            'Right')
         data['Right'] = (centroide_right, dedos_right)
 
     return data
@@ -249,8 +249,7 @@ def inicializar_csv():
         print(f"Se agregarán nuevos registros al final")
 
 
-def guardar_en_csv(clase, secuencia_dedos_centrales_left, secuencia_dedos_centrales_right, vector_binario_left,
-                   vector_binario_right):
+def guardar_en_csv(clase, secuencia_dedos_centrales_left, secuencia_dedos_centrales_right, vector_binario_left, vector_binario_right):
     """Guarda un nuevo registro en el CSV"""
     vector_normalizado_left = (vector_binario_left / 255.0).astype(np.float64)
     vector_normalizado_right = (vector_binario_right / 255.0).astype(np.float64)
@@ -259,7 +258,7 @@ def guardar_en_csv(clase, secuencia_dedos_centrales_left, secuencia_dedos_centra
     secuencia_dedos_str_right = str(secuencia_dedos_centrales_right.tolist())
 
     datos_completos = [clase, secuencia_dedos_str_left,
-                       secuencia_dedos_str_right] + vector_normalizado_left.tolist() + vector_normalizado_right.tolist()
+                    secuencia_dedos_str_right] + vector_normalizado_left.tolist() + vector_normalizado_right.tolist()
 
     if os.path.exists(archivo_csv):
         df = pd.read_csv(archivo_csv)
@@ -287,9 +286,9 @@ def cambiar_clase():
     nueva_clase = input("   Ingrese nueva clase (o Enter para mantener actual): ").strip()
     if nueva_clase:
         clase_actual = nueva_clase
-        print(f"   ✅ Nueva clase establecida: '{clase_actual}'")
+        print(f"Nueva clase establecida: '{clase_actual}'")
     else:
-        print(f"   🔄 Manteniendo clase: '{clase_actual}'")
+        print(f"Manteniendo clase: '{clase_actual}'")
     return clase_actual
 
 
@@ -413,9 +412,9 @@ with mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidenc
                     if len(centroides_trayectoria_left) > 0 or len(centroides_trayectoria_right) > 0:
                         print("Guardando automáticamente...")
                         guardar_en_csv(clase_actual, secuencia_dedos_array_left, secuencia_dedos_array_right,
-                                       vector_binario_left, vector_binario_right)
+                                    vector_binario_left, vector_binario_right)
 
-                        print(f"\n✅ Gesto guardado en CSV:")
+                        print(f"\nGesto guardado en CSV:")
                         print(f"   Clase: '{clase_actual}'")
                         print(f"   Secuencia dedos left: {secuencia_dedos_array_left.shape}")
                         print(f"   Secuencia dedos right: {secuencia_dedos_array_right.shape}")
