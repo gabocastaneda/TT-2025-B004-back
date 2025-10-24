@@ -33,7 +33,7 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
 - `model.py`: Entrena un modelo KNN con los datos del CSV y genera una matriz de confusión para evaluación.
 - `inferencia.py`: Realiza predicciones en tiempo real utilizando el modelo entrenado.
 - `dataset_lsm.csv`: Almacena los datos capturados (clase, secuencia de dedos y vector binario de trayectoria).
-- `knn_model.pkl`: Archivo donde se guarda el modelo KNN entrenado.
+- `knn_gestos_model.pkl`: Archivo donde se guarda el modelo KNN entrenado.
 
 ## Uso
 
@@ -55,7 +55,7 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
      ```bash
      python model.py
      ```
-   - El modelo se guarda como `knn_model.pkl`.
+   - El modelo se guarda como `knn_gestos_model.pkl`.
    - Se muestra una matriz de confusión y métricas de evaluación si hay suficientes datos.
 
 3. **Inferencia en tiempo real**:
@@ -75,22 +75,10 @@ Este proyecto implementa un sistema de reconocimiento de gestos para Lenguaje de
 2. **Entrenamiento**: Usa `model.py` para entrenar el modelo KNN con los datos capturados.
 3. **Inferencia**: Usa `inferencia.py` para clasificar gestos en tiempo real con el modelo entrenado.
 
-## Detalles técnicos
-
-- **Detección de manos**: Utiliza MediaPipe Hands para detectar landmarks de manos con alta precisión (mínimo 0.95 de confianza).
-- **Características**:
-  - Estado de los 5 dedos (0 = cerrado, 1 = abierto) en 5 frames centrales (25 valores).
-  - Trayectoria de la mano convertida a un vector binario de 400 píxeles (20x20).
-- **Modelo**: KNN con 11 vecinos (configurable en `model.py`).
-- **Estandarización**: Los datos se estandarizan a 30 frames, y se seleccionan los 30 frames centrales para la inferencia.
-- **Visualización**: Muestra la trayectoria de la mano en un pizarrón de 200x200 píxeles y el estado de los dedos en tiempo real.
-
 ## Limitaciones
 
 - Requiere buena iluminación y fondo limpio para una detección óptima.
-- Solo detecta una mano a la vez (`max_num_hands=1`), hasta el momento.
 - La precisión depende de la cantidad y calidad de los datos en `dataset_lsm.csv`.
-- El modelo KNN puede no ser óptimo para datasets muy grandes o gestos complejos.
 
 ## Contribuciones
 
