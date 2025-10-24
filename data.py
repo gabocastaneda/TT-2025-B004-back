@@ -24,8 +24,8 @@ puntas = [8, 12, 16, 20]
 frames_video = []
 grabando = False
 mano_detectada_anteriormente = False
-archivo_csv = "dataset_dedos.csv"
-clase_actual = "Si"
+archivo_csv = "dataset_lsm.csv"
+clase_actual = ""
 
 # Diccionario para almacenar el estado de los dedos en tiempo real
 estado_manos = {"derecha": [0, 0, 0, 0, 0], "izquierda": [0, 0, 0, 0, 0]}
@@ -135,11 +135,11 @@ def extraer_centroide_y_dedos(results, width, height):
 
         # Recompute dedos using position-based label
         dedos_left, centroide_left = detectar_dedos_mejorado(results.multi_hand_landmarks[left_idx], width, height,
-                                                             'Left')
+                                                            'Left')
         data['Left'] = (centroide_left, dedos_left)
 
         dedos_right, centroide_right = detectar_dedos_mejorado(results.multi_hand_landmarks[right_idx], width, height,
-                                                               'Right')
+                                                            'Right')
         data['Right'] = (centroide_right, dedos_right)
 
     return data
@@ -250,7 +250,7 @@ def inicializar_csv():
 
 
 def guardar_en_csv(clase, secuencia_dedos_centrales_left, secuencia_dedos_centrales_right, vector_binario_left,
-                   vector_binario_right):
+                vector_binario_right):
     """Guarda un nuevo registro en el CSV"""
     vector_normalizado_left = (vector_binario_left / 255.0).astype(np.float64)
     vector_normalizado_right = (vector_binario_right / 255.0).astype(np.float64)
@@ -259,7 +259,7 @@ def guardar_en_csv(clase, secuencia_dedos_centrales_left, secuencia_dedos_centra
     secuencia_dedos_str_right = str(secuencia_dedos_centrales_right.tolist())
 
     datos_completos = [clase, secuencia_dedos_str_left,
-                       secuencia_dedos_str_right] + vector_normalizado_left.tolist() + vector_normalizado_right.tolist()
+                    secuencia_dedos_str_right] + vector_normalizado_left.tolist() + vector_normalizado_right.tolist()
 
     if os.path.exists(archivo_csv):
         df = pd.read_csv(archivo_csv)
