@@ -14,7 +14,7 @@ bases = [6, 10, 14, 18]
 puntas = [8, 12, 16, 20]
 
 # Variables globales para inferencia
-modelo_knn = "knn_model.pkl"
+modelo_knn = "knn_gestos_model.pkl"
 prediccion_actual = ""
 confianza_actual = 0.0
 
@@ -231,7 +231,7 @@ def cargar_modelo(nombre_archivo="knn_gestos_model.pkl"):
 
 def determinar_prediccion_final(prediccion_encoded, confianza, label_encoder):
     """Determina la predicción final aplicando el umbral de confianza"""
-    if confianza >= UMBRAL_CONFIANZA:
+    if confianza > UMBRAL_CONFIANZA:
         prediccion = label_encoder.inverse_transform([prediccion_encoded])[0]
         estado = "RECONOCIDO"
         color_prediccion = (0, 255, 0)  # Verde
