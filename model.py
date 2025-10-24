@@ -2,10 +2,13 @@ import pandas as pd
 import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 import joblib
 import ast
+import seaborn as sns
+import matplotlib.pyplot as plt
+import os
 
 N_NEIGHBORS = 11
 
@@ -65,6 +68,38 @@ def preparar_datos(csv_path="dataset_lsm.csv"):
     
     return X_combined, y
 
+def plot_confusion_matrix(y_true, y_pred, classes, title='Matriz de Confusión'):
+    """Genera y muestra una matriz de confusión con seaborn"""
+    # Calcular matriz de confusión
+    cm = confusion_matrix(y_true, y_pred)
+    
+    # Crear figura
+    plt.figure(figsize=(10, 8))
+    
+    # Crear heatmap con seaborn
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=classes, yticklabels=classes,
+                cbar_kws={'label': 'Cantidad de muestras'})
+    
+    # Configurar título y etiquetas
+    plt.title(title, fontsize=16, fontweight='bold', pad=20)
+    plt.xlabel('Predicción', fontsize=12)
+    plt.ylabel('Valor Real', fontsize=12)
+    
+    # Rotar etiquetas para mejor legibilidad
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    
+    # Ajustar layout
+    plt.tight_layout()
+    
+    # Guardar la imagen
+    plt.savefig('matriz_confusion.png', dpi=300, bbox_inches='tight')
+    print("Matriz de confusión guardada como 'matriz_confusion.png'")
+    
+    # Mostrar la imagen
+    plt.show()
+
 def entrenar_modelo_knn(X, y, n_neighbors=N_NEIGHBORS, test_size=0.2, random_state=0, shuffle=True):
     """Entrena el modelo KNN"""
     print("\nEntrenando modelo KNN...")
@@ -92,6 +127,11 @@ def entrenar_modelo_knn(X, y, n_neighbors=N_NEIGHBORS, test_size=0.2, random_sta
     print(f"\nPrecisión del modelo: {accuracy:.4f}")
     print("\nReporte de clasificación:")
     print(classification_report(y_test, y_pred, target_names=le.classes_))
+
+    # Calcular y mostrar matriz de confusión
+    print("\nGenerando matriz de confusión...")
+    plot_confusion_matrix(y_test, y_pred, le.classes_, 
+                        title=f'Matriz de Confusión - KNN (k={n_neighbors})\nPrecisión: {accuracy*100:.2f}%')
     
     return knn, le, X_train, X_test, y_train, y_test
 
