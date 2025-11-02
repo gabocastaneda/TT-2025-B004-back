@@ -15,7 +15,7 @@ import os
 
 # Parámetros base
 N_NEIGHBORS = 7
-TEST_SIZE = 0.2
+TEST_SIZE = 0.3
 RANDOM_STATE = 0
 
 # Crear directorio para matrices si no existe

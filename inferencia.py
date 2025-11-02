@@ -21,7 +21,7 @@ prediccion_actual = ""
 confianza_actual = 0.0
 
 # Umbral de confianza
-UMBRAL_CONFIANZA = 0.70  # 70%
+UMBRAL_CONFIANZA = 0.60  
 
 
 def centroide(lista_coordenadas):
