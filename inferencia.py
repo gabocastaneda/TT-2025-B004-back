@@ -6,7 +6,9 @@ import time
 import joblib
 import pandas as pd
 import ast
+import warnings
 
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
 
 pulgar = [1, 2, 4]
 puntos_palma = [0, 1, 2, 5, 9, 13, 17]
@@ -21,7 +23,7 @@ prediccion_actual = ""
 confianza_actual = 0.0
 
 # Umbral de confianza
-UMBRAL_CONFIANZA = 0.60  
+UMBRAL_CONFIANZA = 0.50  
 
 
 def centroide(lista_coordenadas):
@@ -198,7 +200,7 @@ def main():
     print("   La grabación comenzará automáticamente cuando detecte una mano")
     print("   Presione ESC para salir")
 
-    with mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidence=0.80) as hands:
+    with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.70, min_tracking_confidence = 0.70) as hands:
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -287,18 +289,18 @@ def main():
                                 estado_prediccion = estado
                                 color_prediccion = color_pred
 
-                                print(f"Predicción: {prediccion} (Confianza: {confianza:.2f}) - {estado}")
+                                print(f"Predicción: {prediccion} -- Confianza: {confianza:.2f}")
 
                             except Exception as e:
-                                print(f"Error en predicción: {e}")
-                                prediccion_actual = "Error en predicción"
+                                print(f"Error en prediccion: {e}")
+                                prediccion_actual = "Error en prediccion"
                                 confianza_actual = 0.0
                                 estado_prediccion = "ERROR"
                                 color_prediccion = (0, 0, 255)
                         else:
                             prediccion_actual = "Sin datos"
                             confianza_actual = 0.0
-                            estado_prediccion = "SIN_DATOS"
+                            estado_prediccion = "SIN DATOS"
                             color_prediccion = (128, 128, 128)
 
                         estado_texto = "PROCESADO"
@@ -334,7 +336,7 @@ def main():
             cv2.putText(frame, f"Umbral: {UMBRAL_CONFIANZA*100}%", (width - 150, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
-            cv2.imshow('Inferencia en Tiempo Real - Detección de Gestos', frame)
+            cv2.imshow('Inferencia en Tiempo Real - Deteccion de Gestos', frame)
 
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC
