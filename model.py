@@ -12,6 +12,7 @@ import os
 
 N_NEIGHBORS = 11
 
+
 def preparar_datos(csv_path="dataset_lsm.csv"):
     """Prepara los datos para el entrenamiento"""
     print("Cargando datos...")
@@ -66,62 +67,7 @@ def preparar_datos(csv_path="dataset_lsm.csv"):
     print(f"Características combinadas: {X_combined.shape}")
     print(f"Etiquetas: {y.shape}")
     
-<<<<<<< HEAD
-    X = np.array(X)
-    
-    print(f"Características: {X.shape[1]} dimensiones")
-    print(f"Muestras: {X.shape[0]}")
-    
-    # Dividir datos para evaluación
-    if len(df) > 10:
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0, stratify=y, shuffle=True) 
-        
-        # Entrenar modelo KNN
-        knn = KNeighborsClassifier(n_neighbors=n_vecinos)
-        knn.fit(X_train, y_train)
-        
-        # Evaluar modelo
-        y_pred = knn.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-        
-        print(f"Modelo KNN entrenado exitosamente")
-        print(f"Precisión en test: {accuracy:.3f}")
-        print(f"Vecinos (k): {n_vecinos}")
-        print(f"Distribución de clases:")
-        
-        clases_unicas, conteos = np.unique(y, return_counts=True)
-        for clase, conteo in zip(clases_unicas, conteos):
-            print(f"   - {clase}: {conteo} muestras")
-        
-        # Reporte de clasificación detallado
-        print("\nReporte de clasificación:")
-        print(classification_report(y_test, y_pred))
-        
-        # Matriz de confusión
-        cm = confusion_matrix(y_test, y_pred, labels=clases_unicas)
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=clases_unicas, yticklabels=clases_unicas)
-        plt.title("Matriz de Confusión - KNN")
-        plt.xlabel("Predicción")
-        plt.ylabel("Real")
-        plt.tight_layout()
-        plt.show()
-        plt.savefig()
-        
-    else:
-        # Entrenar con todos los datos si hay pocas muestras
-        knn = KNeighborsClassifier(n_neighbors=n_vecinos)
-        knn.fit(X, y)
-        print(f"Modelo KNN entrenado con {len(X)} muestras (sin división train/test)")
-    
-    # Guardar modelo
-    joblib.dump(knn, modelo_salida)
-    print(f"Modelo guardado en: {modelo_salida}")
-    
-    return knn
-=======
     return X_combined, y
->>>>>>> nueva
 
 def plot_confusion_matrix(y_true, y_pred, classes, title='Matriz de Confusión'):
     """Genera y muestra una matriz de confusión con seaborn"""
@@ -190,7 +136,7 @@ def entrenar_modelo_knn(X, y, n_neighbors=N_NEIGHBORS, test_size=0.2, random_sta
     
     return knn, le, X_train, X_test, y_train, y_test
 
-def guardar_modelo(model, label_encoder, nombre_archivo="knn_gestos_model.pkl"):
+def guardar_modelo(model, label_encoder, nombre_archivo="knn_model.pkl"):
     """Guarda el modelo entrenado"""
     modelo_guardar = {
         'model': model,

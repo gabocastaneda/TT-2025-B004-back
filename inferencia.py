@@ -14,7 +14,7 @@ bases = [6, 10, 14, 18]
 puntas = [8, 12, 16, 20]
 
 # Variables globales para inferencia
-modelo_knn = "knn_gestos_model.pkl"
+modelo_knn = "knn_model.pkl"
 prediccion_actual = ""
 confianza_actual = 0.0
 
@@ -217,7 +217,7 @@ def preparar_caracteristicas_inferencia(secuencia_dedos_left, secuencia_dedos_ri
     
     return caracteristicas.reshape(1, -1)
 
-def cargar_modelo(nombre_archivo="knn_gestos_model.pkl"):
+def cargar_modelo(nombre_archivo=modelo_knn):
     """Carga el modelo entrenado"""
     try:
         modelo_cargado = joblib.load(nombre_archivo)
