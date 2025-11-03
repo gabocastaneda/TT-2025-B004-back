@@ -327,12 +327,10 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
             cv2.putText(frame, f"Prediccion: {prediccion_actual}", (10, 90),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_prediccion, 2)
-            cv2.putText(frame, f"Confianza: {confianza_actual:.2f}", (10, 120),
+            cv2.putText(frame, f"Confianza: {confianza_actual*100}%", (10, 120),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
             cv2.putText(frame, f"Estado: {estado_prediccion}", (10, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_prediccion, 2)
-            cv2.putText(frame, f"Umbral: {UMBRAL_CONFIANZA*100}%", (width - 150, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
             cv2.imshow('Inferencia en Tiempo Real - Deteccion de Gestos', frame)
 
