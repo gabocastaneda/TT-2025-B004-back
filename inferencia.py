@@ -162,7 +162,7 @@ def cargar_modelo(nombre_archivo=modelo_knn):
         return None
 
 def determinar_prediccion_final(prediccion_encoded, confianza, label_encoder):
-    if confianza > UMBRAL_CONFIANZA:
+    if confianza >= UMBRAL_CONFIANZA:
         prediccion = label_encoder.inverse_transform([prediccion_encoded])[0]
         return prediccion, "RECONOCIDO", (0, 255, 0)
     else:
@@ -198,7 +198,7 @@ def main():
     print("   La grabación comenzará automáticamente cuando detecte una mano")
     print("   Presione ESC para salir")
 
-    with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.70, min_tracking_confidence = 0.70) as hands:
+    with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.80, min_tracking_confidence = 0.70) as hands:
         while True:
             ret, frame = cap.read()
             if not ret:
