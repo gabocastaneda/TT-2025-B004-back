@@ -113,7 +113,7 @@ def entrenar_modelos(X, y):
     resultados = {}
 
     for nombre, modelo in modelos.items():
-        print(f"\n🔹 Entrenando modelo: {nombre}...")
+        print(f"\n- 6Entrenando modelo: {nombre}...")
         modelo.fit(X_train, y_train)
         y_pred = modelo.predict(X_test)
 
