@@ -14,7 +14,7 @@ bases = [6, 10, 14, 18]
 puntas = [8, 12, 16, 20]
 
 # Archivo del modelo final
-modelo_knn = "modelo_final.pkl"
+modelo = "modelo.pkl"
 
 # Variables globales
 prediccion_actual = ""
@@ -148,7 +148,7 @@ def preparar_caracteristicas_inferencia(secuencia_dedos_left, secuencia_dedos_ri
                                 vector_left_norm, vector_right_norm])
     return caracteristicas.reshape(1, -1)
 
-def cargar_modelo(nombre_archivo=modelo_knn):
+def cargar_modelo(nombre_archivo=modelo):
     """Carga el modelo entrenado con soporte para distintos tipos"""
     try:
         modelo_cargado = joblib.load(nombre_archivo)

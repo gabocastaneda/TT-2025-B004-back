@@ -1,12 +1,13 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
 import os
+import joblib
 
 CSV_PATH = 'dataset_lsm.csv'
 KNN_DIR = 'knn_matrices'
@@ -107,27 +108,45 @@ def plot_confusion_matrix(y_true, y_pred, classes, title="Matriz de Confusión",
     
     plt.show()
 
-if __name__ == "__main__":
+def entrenar_y_guardar():
     X, y, scaler = preparar_datos(CSV_PATH)
-    resultados = []
 
-    for k in range(5, 21, 2):
-        modelo = KNN(k=k)  
+    resultados = []
+    for i in range(5, 21, 2):
+        modelo = KNN(k = i)
         modelo.fit(X, y)
         y_pred = modelo.predict(X)
         acc = accuracy_score(y, y_pred)
-        print(f'k={k} | Exactitud: {acc:.4f}')
-        resultados.append((k, acc))
+        print(f'Con k = {i}, la exactitud es: {acc * 100}%')
+        resultados.append((i, acc))
 
-    # Imprime el mejor k encontrado
     mejor_k, mejor_acc = max(resultados, key=lambda x: x[1])
-    print(f"\nMejor k: {mejor_k} con exactitud {mejor_acc:.4f}")
+    print(f'Mejor k = {mejor_k}, con exactitud {mejor_acc * 100}%')
 
-    # Si quieres ver el reporte y matriz de confusión para el mejor k:
-    modelo = KNN(k=mejor_k)
-    modelo.fit(X, y)
-    y_pred = modelo.predict(X)
+    model = KNN(k = mejor_k)
+    model.fit(X, y)
 
+    label_encoder = LabelEncoder()
+    y_encoded = label_encoder.fit_transform(y)
+
+    modelo_guardar = {
+        'model' : model,
+        'scaler' : scaler,
+        'label_encoder' : label_encoder,
+        'classes' : label_encoder.classes_,
+        'mejor_k' : mejor_k,
+        'modelo_nombre': 'MiKNN'
+    }
+
+    joblib.dump(modelo_guardar, 'modelo.pkl')
+    print('Modelo guardado en modelo.pkl')
+
+    y_pred = model.predict(X)
     print('Reporte de clasificación: ')
     print(classification_report(y, y_pred))
     plot_confusion_matrix(y, y_pred, classes=np.unique(y))
+
+    return model
+
+if __name__ == '__main__':
+    entrenar_y_guardar()
