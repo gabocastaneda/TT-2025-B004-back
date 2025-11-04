@@ -4,9 +4,41 @@ import numpy as np
 from math import acos, degrees
 import time
 import joblib
+from collections import Counter
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
+class KNN:
+    def __init__(self, k):
+        self.k = k
+
+    def fit(self, X, y):
+        self.X_train = X
+        self.y_train = y
+
+    def predict(self, X):
+        return np.array([self._predecir(x) for x in X])
+    
+    def predict_proba(self, X):
+        predictions = []
+        for x in X:
+            distancias = np.linalg.norm(self.X_train - x, axis=1)
+            vecinos_idx = np.argsort(distancias)[:self.k]
+            etiquetas_vecinas = self.y_train[vecinos_idx]
+            counter = Counter(etiquetas_vecinas)
+            total_vecinos = len(etiquetas_vecinas)
+            probas = [counter.get(clase, 0) / total_vecinos for clase in np.unique(self.y_train)]
+            predictions.append(probas)
+        
+        return np.array(predictions)
+
+    def _predecir(self, x):
+        distancias = np.linalg.norm(self.X_train - x, axis=1)
+        vecinos_idx = np.argsort(distancias)[:self.k]
+        etiquetas_vecinas = self.y_train[vecinos_idx]
+        etiqueta_mas_comun = Counter(etiquetas_vecinas).most_common(1)[0][0]
+        return etiqueta_mas_comun
+
 
 pulgar = [1, 2, 4]
 puntos_palma = [0, 1, 2, 5, 9, 13, 17]
@@ -21,7 +53,7 @@ prediccion_actual = ""
 confianza_actual = 0.0
 
 # Umbral de confianza
-UMBRAL_CONFIANZA = 0.50  
+UMBRAL_CONFIANZA = 0.70  
 
 
 def centroide(lista_coordenadas):
@@ -155,18 +187,22 @@ def cargar_modelo(nombre_archivo=modelo):
         print(f"Modelo cargado: {nombre_archivo}")
         print(f"Tipo de modelo: {modelo_cargado.get('nombre_modelo', 'Desconocido')}")
         print(f"Clases disponibles: {list(modelo_cargado['classes'])}")
+        print(f"Mejor k utilizado: {modelo_cargado.get('mejor_k', 'N/A')}")
         print(f"Umbral de confianza: {UMBRAL_CONFIANZA*100}%")
         return modelo_cargado
     except Exception as e:
         print(f"Error cargando modelo: {e}")
         return None
 
-def determinar_prediccion_final(prediccion_encoded, confianza, label_encoder):
+def determinar_prediccion_final(prediccion, confianza, clases_modelo):
     if confianza >= UMBRAL_CONFIANZA:
-        prediccion = label_encoder.inverse_transform([prediccion_encoded])[0]
-        return prediccion, "RECONOCIDO", (0, 255, 0)
+        if prediccion in clases_modelo:
+            return prediccion, "RECONOCIDO", (0, 255, 0)
+        else:
+            return "Gesto desconocido", "NO_RECONOCIDO", (255, 0, 0)
     else:
         return "Vuelve a intentarlo", "BAJA_CONFIANZA", (0, 165, 255)
+            
 
 def main():
     modelo_data = cargar_modelo()
@@ -174,7 +210,7 @@ def main():
         return
 
     model = modelo_data['model']
-    label_encoder = modelo_data['label_encoder']
+    clases_modelo = modelo_data['classes']
     scaler = modelo_data.get('scaler', None)
 
     mp_drawing = mp.solutions.drawing_utils
@@ -280,7 +316,7 @@ def main():
                                 confianza = np.max(probabilidades)
 
                                 prediccion, estado, color_pred = determinar_prediccion_final(
-                                    prediccion_encoded, confianza, label_encoder)
+                                    prediccion_encoded, confianza, clases_modelo)
 
                                 prediccion_actual = prediccion
                                 confianza_actual = confianza

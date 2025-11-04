@@ -133,7 +133,8 @@ def entrenar_y_guardar():
         'model' : model,
         'scaler' : scaler,
         'label_encoder' : label_encoder,
-        'classes' : label_encoder.classes_,
+        'classes' : np.unique(y).tolist(),
+        'y_train' : y,
         'mejor_k' : mejor_k,
         'modelo_nombre': 'MiKNN'
     }
