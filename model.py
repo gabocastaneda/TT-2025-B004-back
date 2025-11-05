@@ -89,7 +89,7 @@ def entrenar_y_guardar():
     X, y, scaler = preparar_datos(CSV_PATH)
 
     resultados = []
-    for i in range(3, 21, 2):
+    for i in range(5, 21, 2):
         modelo = KNN(k = i)
         modelo.fit(X, y)
         y_pred = modelo.predict(X)

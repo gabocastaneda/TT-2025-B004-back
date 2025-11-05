@@ -16,7 +16,7 @@ bases = [6, 10, 14, 18]
 puntas = [8, 12, 16, 20]
 
 # Archivo del modelo final
-modelo = "modelo.pkl"
+modelo = "modelos\kkn\modelo.pkl"
 
 # Variables globales
 prediccion_actual = ""
@@ -199,11 +199,6 @@ def main():
     estado_prediccion = "INICIAL"
     color_prediccion = (255, 255, 255)
 
-    print("\nSISTEMA DE INFERENCIA EN TIEMPO REAL")
-    print(f"   Umbral de confianza: {UMBRAL_CONFIANZA*100}%")
-    print("   La grabación comenzará automáticamente cuando detecte una mano")
-    print("   Presione ESC para salir")
-
     with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.70, min_tracking_confidence = 0.90) as hands:
         while True:
             ret, frame = cap.read()
@@ -224,7 +219,6 @@ def main():
                 prediccion_actual = "Grabando..."
                 estado_prediccion = "GRABANDO"
                 color_prediccion = (0, 255, 255)
-                print("¡Mano detectada! Comenzando grabación...")
 
             if grabando:
                 if mano_actualmente_detectada:
@@ -247,7 +241,7 @@ def main():
                 else:
                     if time.time() - ultima_deteccion > 1.0:
                         grabando = False
-                        print(f"Grabación terminada. {len(frames_video)} frames capturados")
+                        
 
                         secuencia_dedos_array_left = np.zeros((5, 5), dtype=int)
                         secuencia_dedos_array_right = np.zeros((5, 5), dtype=int)
@@ -293,7 +287,7 @@ def main():
                                 estado_prediccion = estado
                                 color_prediccion = color_pred
 
-                                print(f"Predicción: {prediccion} -- Confianza: {confianza:.2f}")
+                                print(prediccion.lower())
 
                             except Exception as e:
                                 print(f"Error en prediccion: {e}")
