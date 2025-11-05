@@ -6,7 +6,7 @@ import time
 import joblib
 from collections import Counter
 import warnings
-from modelos.knn_model import KNN
+from models.knn_model import KNN
 
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
 
