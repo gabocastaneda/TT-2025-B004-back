@@ -6,39 +6,9 @@ import time
 import joblib
 from collections import Counter
 import warnings
+from models.knn_model import KNN
 
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
-class KNN:
-    def __init__(self, k):
-        self.k = k
-
-    def fit(self, X, y):
-        self.X_train = X
-        self.y_train = y
-
-    def predict(self, X):
-        return np.array([self._predecir(x) for x in X])
-    
-    def predict_proba(self, X):
-        predictions = []
-        for x in X:
-            distancias = np.linalg.norm(self.X_train - x, axis=1)
-            vecinos_idx = np.argsort(distancias)[:self.k]
-            etiquetas_vecinas = self.y_train[vecinos_idx]
-            counter = Counter(etiquetas_vecinas)
-            total_vecinos = len(etiquetas_vecinas)
-            probas = [counter.get(clase, 0) / total_vecinos for clase in np.unique(self.y_train)]
-            predictions.append(probas)
-        
-        return np.array(predictions)
-
-    def _predecir(self, x):
-        distancias = np.linalg.norm(self.X_train - x, axis=1)
-        vecinos_idx = np.argsort(distancias)[:self.k]
-        etiquetas_vecinas = self.y_train[vecinos_idx]
-        etiqueta_mas_comun = Counter(etiquetas_vecinas).most_common(1)[0][0]
-        return etiqueta_mas_comun
-
 
 pulgar = [1, 2, 4]
 puntos_palma = [0, 1, 2, 5, 9, 13, 17]
@@ -234,7 +204,7 @@ def main():
     print("   La grabación comenzará automáticamente cuando detecte una mano")
     print("   Presione ESC para salir")
 
-    with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.80, min_tracking_confidence = 0.70) as hands:
+    with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.70, min_tracking_confidence = 0.90) as hands:
         while True:
             ret, frame = cap.read()
             if not ret:
