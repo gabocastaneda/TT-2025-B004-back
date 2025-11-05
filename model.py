@@ -56,8 +56,7 @@ def preparar_datos(csv_path):
 
     # Reducir redundancias
     pca = PCA(n_components=0.95)
-    
-    X_reduced = pca.fit_transform(X_combined)
+    X_reduced = pca.fit_transform(X_scaled)
 
     y = df['clase'].values
 

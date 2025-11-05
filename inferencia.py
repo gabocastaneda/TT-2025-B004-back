@@ -5,7 +5,6 @@ from math import acos, degrees
 import time
 import joblib
 import warnings
-# from models.knn_model import KNN
 
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
 
