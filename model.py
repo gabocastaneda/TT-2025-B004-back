@@ -6,7 +6,7 @@ import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
-from models.knn_model import KNN
+from modelos.model_knn import KNN
 
 CSV_PATH = 'dataset_lsm.csv'
 
