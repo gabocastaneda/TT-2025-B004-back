@@ -287,9 +287,9 @@ def cambiar_clase():
     nueva_clase = input("   Ingrese nueva clase (o Enter para mantener actual): ").strip()
     if nueva_clase:
         clase_actual = nueva_clase
-        print(f"   ✅ Nueva clase establecida: '{clase_actual}'")
+        print(f"Nueva clase establecida: '{clase_actual}'")
     else:
-        print(f"   🔄 Manteniendo clase: '{clase_actual}'")
+        print(f"Manteniendo clase: '{clase_actual}'")
     return clase_actual
 
 
