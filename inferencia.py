@@ -4,9 +4,8 @@ import numpy as np
 from math import acos, degrees
 import time
 import joblib
-from collections import Counter
 import warnings
-from models.knn_model import KNN
+# from models.knn_model import KNN
 
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
 
@@ -199,7 +198,7 @@ def main():
     estado_prediccion = "INICIAL"
     color_prediccion = (255, 255, 255)
 
-    with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.70, min_tracking_confidence = 0.90) as hands:
+    with mp_hands.Hands(model_complexity=0, max_num_hands=2, min_detection_confidence=0.80, min_tracking_confidence = 0.90) as hands:
         while True:
             ret, frame = cap.read()
             if not ret:

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 from models.knn_model import KNN
+from sklearn.decomposition import PCA
 
 CSV_PATH = 'dataset_lsm.csv'
 
@@ -53,12 +54,16 @@ def preparar_datos(csv_path):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_combined)
 
+    # Reducir redundancias
+    pca = PCA(n_components=0.95)
+    X_reduced = pca.fit_transform(X_combined)
+
     y = df['clase'].values
 
-    print(f'Caracteristicas totales: {X_combined.shape}')
+    print(f'Caracteristicas totales: {X_reduced.shape}')
     print(f'Etiquetas: {y.shape}')
 
-    return X_scaled, y, scaler
+    return X_reduced, y, scaler
 
 def plot_confusion_matrix(y_true, y_pred, classes, title="Matriz de Confusión", save_path=None):
     cm = confusion_matrix(y_true, y_pred)
