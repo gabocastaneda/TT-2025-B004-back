@@ -51,7 +51,6 @@ def preparar_datos(csv_path):
 
     # Estandarizar los datos
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_combined)
 
     y = df['clase'].values
 

@@ -155,7 +155,7 @@ def cargar_modelo(nombre_archivo=modelo):
         print(f"Modelo cargado: {nombre_archivo}")
         print(f"Tipo de modelo: {modelo_cargado.get('nombre_modelo', 'Desconocido')}")
         print(f"Clases disponibles: {list(modelo_cargado['classes'])}")
-        print(f"Mejor k utilizado: {modelo_cargado.get('mejor_k', 'N/A')}")
+        print(f"k utilizado: 5")
         print(f"Umbral de confianza: {UMBRAL_CONFIANZA*100}%")
         return modelo_cargado
     except Exception as e:
