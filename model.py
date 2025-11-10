@@ -51,8 +51,9 @@ def preparar_datos(csv_path):
 
     # Estandarizar los datos
     scaler = StandardScaler()
-
+    X_scaled = scaler.fit_transform(X_combined)
     y = df['clase'].values
+    
 
     print(f'Caracteristicas totales: {X_combined.shape}')
     print(f'Etiquetas: {y.shape}')
